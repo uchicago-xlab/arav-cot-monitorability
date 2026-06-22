@@ -1,0 +1,131 @@
+# Model roster — logical name -> OpenRouter model + provider pin + CoT-access + tier + necessity.
+# Consumed by src/cot_mon/models/roster.py. All calls via OpenRouter (openrouter/<provider>/<model>).
+#
+# Phase-0 VERIFIED 2026-06-22 (scripts/phase0_*.py; detail in logs/). Slugs live; reasoning
+# exposure + prefill + per-model necessity checked; providers PINNED.
+#
+# FIELDS
+#   provider          exact OpenRouter endpoint TAG (provider[/quant]); roster.py pins it via
+#                     model arg provider={only:[tag], allow_fallbacks:false} -> same backend+quant
+#                     every run, or fail loudly (CLAUDE.md reproducibility).
+#   cot_access        native_raw | summary | body_channel | disabled
+#                       native_raw   open weights, raw faithful trace via `reasoning`
+#                       summary      closed models — reasoning field is a SUMMARY (NOT faithful)
+#                       body_channel reasoning forced into the message body (agentic / faithful repl.)
+#                       disabled     hidden channel OFF via reasoning:{enabled:false} -> body CoT
+#   reasoning_enabled true|false|null -> OpenRouter reasoning.enabled (roster.py forwards as the
+#                     `reasoning_enabled` model arg; null = omit, use model default).
+#   tier              faithful_hints_gradient | faithful_conditional | faithful_agentic |
+#                     generalization_only | monitor   (SPEC §3 actor tiers)
+#   necessity         confirmed | todo | fails_easy | env_calibrated | na   (per-model; CLAUDE.md
+#                     CORE PRINCIPLE: faithful actor needs channel-disable AND task CoT-necessary)
+#   uplift_set        id/path of this model's per-actor uplift set (built by monitors/uplift_filter.py)
+
+defaults:
+  fpr_targets: [0.01, 0.05]   # report recall@1% and @5% FPR (SPEC §3.3)
+  provider_pin: null          # fallback only; every model sets an explicit `provider`
+
+actors:
+  # ── Faithful §3.1/§3.2 (channel-disabled or raw + prefill + necessity) ──
+  gemini_3_flash:                                  # PRIMARY faithful actor (SPEC §3, §5.1 START HERE)
+    id: openrouter/google/gemini-3-flash-preview
+    provider: google-vertex
+    cot_access: disabled
+    reasoning_enabled: false                       # rtoks=0; reasons in body, which we judge
+    tier: faithful_hints_gradient
+    necessity: confirmed                           # phase0_necessity: forbidden 0/6 -> allowed 6/6, uplift +1.00
+    uplift_set: null
+    experiments: [hints, gradient, oversight, followup_a]
+    notes: "PRIMARY. Channel disables (rtoks=0), prefill works, necessity +1.00."
+  qwen3:
+    id: openrouter/qwen/qwen3-235b-a22b-thinking-2507   # cheap dev alt: qwen3-30b-a3b-thinking-2507
+    provider: wandb/bf16                           # bf16 > fp8 alts
+    cot_access: native_raw
+    reasoning_enabled: true
+    tier: faithful_hints_gradient
+    necessity: todo                                # strong model — verify per-model uplift (likely needs harder items)
+    uplift_set: null
+    experiments: [hints, gradient, oversight, followup_a]
+    notes: "Open-weight faithful raw CoT; §4.4 summarization source; §7 RL base. prefill confirmed."
+  gpt_oss_120b:
+    id: openrouter/openai/gpt-oss-120b
+    provider: deepinfra/bf16                        # model has fp4..fp16 endpoints; pin bf16
+    cot_access: native_raw
+    reasoning_enabled: true
+    tier: faithful_hints_gradient
+    necessity: todo
+    uplift_set: null
+    experiments: [hints, gradient, oversight, followup_a]
+    notes: "Open-weight faithful raw CoT; fallback substrate if qwen3 unavailable."
+  gpt_5_5:                                          # CONDITIONAL — faithful ONLY channel-disabled
+    id: openrouter/openai/gpt-5.5                   # unlisted in /models but routable; fallback openai/gpt-5
+    provider: openai
+    cot_access: disabled
+    reasoning_enabled: false                        # the ONLY genuine disable (effort:minimal/exclude do NOT)
+    tier: faithful_conditional
+    necessity: fails_easy                           # one-shots easy items (uplift +0.33) -> needs high difficulty
+    uplift_set: null
+    experiments: [gradient, oversight, followup_a]  # hints PENDING per-actor GPQA uplift yield
+    notes: "Faithful ONLY with reasoning:{enabled:false}. Scale-erosion subject (Follow-up C); high-B sweep. reasoning-ON = generalization-only."
+
+  # ── Faithful §6 / Follow-up A only (agentic; no prefill needed) ──
+  opus_4_8:
+    id: openrouter/anthropic/claude-opus-4.8
+    provider: anthropic
+    cot_access: body_channel
+    reasoning_enabled: false                        # thinking-off -> no hidden channel (verify via OpenRouter)
+    tier: faithful_agentic
+    necessity: env_calibrated                       # per-model §6 environment calibration
+    uplift_set: null
+    experiments: [oversight, followup_a]            # NO prefill via OpenRouter -> out of §3.1/§3.2
+    notes: "Frontier closed faithful actor (thinking-off). Anthropic-direct prefill probe PENDING."
+  gemini_2_5_flash:
+    id: openrouter/google/gemini-2.5-flash
+    provider: google-vertex
+    cot_access: body_channel
+    reasoning_enabled: null                         # reasoning=none natively
+    tier: faithful_agentic
+    necessity: todo
+    uplift_set: null
+    experiments: [gradient, oversight, followup_a]  # Flash-lineage ladder member (Follow-up C)
+    notes: "Flash-lineage ladder (2.5 -> 3-flash -> 3.5) for Follow-up C."
+
+  # ── Generalization-only (mandatory hidden reasoning — faithfulness UNVERIFIABLE; caveated) ──
+  gemini_2_5_pro:                                   # REPLICATION ANCHOR
+    id: openrouter/google/gemini-2.5-pro
+    provider: google-vertex
+    cot_access: summary
+    reasoning_enabled: null                         # mandatory hidden reasoning
+    tier: generalization_only
+    necessity: na
+    uplift_set: null
+    experiments: [hints, gradient, oversight]
+    notes: "Replication ANCHOR (closest surviving analog to the paper). Generalization-only — caveated datapoints, never load-bearing."
+  gemini_3_1_pro:
+    id: openrouter/google/gemini-3.1-pro-preview
+    provider: google-vertex
+    cot_access: summary
+    reasoning_enabled: null                         # phase0: reasoning MANDATORY, cannot disable
+    tier: generalization_only
+    necessity: na
+    uplift_set: null
+    experiments: [hints, gradient, oversight]
+    notes: "Strong Gemini 3.x; reasoning MANDATORY (cannot disable) -> generalization-only."
+
+monitors:
+  gemini_3_5_flash:           # weak monitor; ALSO the §4.4 summarizer
+    id: openrouter/google/gemini-3.5-flash
+    provider: google-vertex
+    tier: monitor
+    role: [detection, summarizer]
+  opus_4_8_monitor:           # strong monitor
+    id: openrouter/anthropic/claude-opus-4.8
+    provider: anthropic
+    tier: monitor
+    role: [detection]
+  gemini_2_5_flash_lite:      # §6 monitor proxy for the retired Gemini 2.0 Flash
+    id: openrouter/google/gemini-2.5-flash-lite
+    provider: google-vertex
+    tier: monitor
+    role: [detection]
+    notes: "Documented proxy for the retired 2.0 Flash monitor (SPEC §5.3)."
