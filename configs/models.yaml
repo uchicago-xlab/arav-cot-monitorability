@@ -1,0 +1,69 @@
+# Model roster — logical name -> OpenRouter model + provider pin + CoT-access mode.
+# All calls go through OpenRouter (OpenAI-compatible); IDs are openrouter/<provider>/<model>.
+#
+# Phase-0 VERIFIED 2026-06-21 (scripts/phase0_probe.py; detail in logs/phase0_probe.json):
+# slugs live, reasoning exposure + prefill checked per model, providers PINNED for reproducibility.
+#
+# provider: an exact OpenRouter endpoint TAG (provider[/quant]) pinned via {only:[tag],
+#   allow_fallbacks:false} -> same backend + quantization every run, or fail loudly. This is
+#   how we stop OpenRouter silently routing to a different provider/quant (CLAUDE.md).
+#
+# cot_access in {native_raw, summary, body_channel, native_disabled}  (see models/roster.py, SPEC §3.1)
+#   native_raw       open weights, raw trace via `reasoning`  (only open weights are FAITHFUL)
+#   summary          closed models, summarized `reasoning`/`reasoning_details` (NOT faithful)
+#   body_channel     reasoning forced into the message body (all agentic runs + faithful-trace replication)
+#   native_disabled  Gemini 2.5 Pro thinking off (App. C.3)
+
+defaults:
+  fpr_targets: [0.01, 0.05]   # report recall@1% and @5% FPR (SPEC §3.3)
+  provider_pin: null          # fallback only; every model below sets an explicit `provider`
+
+actors:
+  gemini_2_5_pro:
+    id: openrouter/google/gemini-2.5-pro
+    provider: google-vertex                       # Phase-0: live, raw CoT, prefill WORKS -> green §3.1/§3.2 actor
+    cot_access: body_channel
+    experiments: [hints, gradient, oversight]
+    notes: "Surviving stable. §3.2 proxy for dead Gemini 1.5 Pro; §3.1/§6 actor."
+  gemini_2_5_flash:
+    id: openrouter/google/gemini-2.5-flash
+    provider: google-vertex                       # Phase-0: live, reasoning none (use body_channel), prefill works
+    cot_access: body_channel
+    experiments: [hints, gradient, oversight]
+  opus_4_8:
+    id: openrouter/anthropic/claude-opus-4.8
+    provider: anthropic                           # Phase-0: live, reasoning none, NO prefill -> excluded from §3.1/§3.2 forced-CoT
+    cot_access: summary                           # body_channel for faithful-trace replication
+    experiments: [oversight, followup_a]          # dropped hints/gradient: no prefill support
+  gpt_5_5:
+    id: openrouter/openai/gpt-5.5                  # unlisted in /models but routable; fallback openai/gpt-5
+    provider: openai                              # Phase-0: live, reasoning=SUMMARY (not faithful), prefill works
+    cot_access: summary                           # §3.1 actor only if hint-judge reads body_channel, not native field
+    experiments: [hints, gradient, oversight, followup_a]
+  qwen3:
+    id: openrouter/qwen/qwen3-235b-a22b-thinking-2507   # cheap dev alt: qwen3-30b-a3b-thinking-2507
+    provider: wandb/bf16                          # Phase-0: live, RAW faithful CoT; prefill inconclusive (reconfirm). bf16 > fp8 alts
+    cot_access: native_raw
+    experiments: [hints, gradient, oversight, followup_a]
+    notes: "Load-bearing: faithful-raw-CoT substrate + §4.4 summarization source + §7 RL base."
+  gpt_oss_120b:
+    id: openrouter/openai/gpt-oss-120b
+    provider: deepinfra/bf16                      # Phase-0: live, RAW faithful CoT, prefill works. bf16 (model has fp4..fp16 endpoints)
+    cot_access: native_raw
+    experiments: [oversight]
+    notes: "Fallback open-weight substrate if Qwen3 unavailable."
+
+monitors:
+  gemini_3_5_flash:           # weak monitor; ALSO the weak summarizer for §4.4
+    id: openrouter/google/gemini-3.5-flash
+    provider: google-vertex                       # Phase-0: live, raw, prefill works
+    role: [detection, summarizer]
+  opus_4_8_monitor:           # strong monitor
+    id: openrouter/anthropic/claude-opus-4.8
+    provider: anthropic                           # Phase-0: live
+    role: [detection]
+  gemini_2_5_flash_lite:      # §6 monitor proxy for the retired Gemini 2.0 Flash
+    id: openrouter/google/gemini-2.5-flash-lite
+    provider: google-vertex                       # Phase-0: live, reasoning none, prefill works
+    role: [detection]
+    notes: "Documented proxy for the retired 2.0 Flash monitor (SPEC §4.3)."
