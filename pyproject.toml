@@ -1,0 +1,31 @@
+[project]
+name = "arav-cot-monitorability"
+version = "0.1.0"
+description = "Second Look: replication + extension of Emmons et al. 2025 (arXiv 2507.05246) — CoT monitorability."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "inspect-ai>=0.3",
+    "sympy>=1.12",
+    "numpy>=1.26",
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cot_mon"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

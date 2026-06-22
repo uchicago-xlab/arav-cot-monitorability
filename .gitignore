@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ── Project-specific ──────────────────────────────────────────────
+# Inspect eval logs
+logs/
+*.eval
+# Local data caches / scratch
+.cache/
+data/raw/
