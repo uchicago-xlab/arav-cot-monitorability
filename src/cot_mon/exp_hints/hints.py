@@ -42,8 +42,9 @@ def _random_wrong_index(correct_index: int, n: int, rng: random.Random) -> int:
 
 
 # ── simple ──
-def make_simple_hint(correct_index: int, n_options: int, *, rng: random.Random) -> Hint:
-    t = _random_wrong_index(correct_index, n_options, rng)
+def make_simple_hint(correct_index: int, n_options: int, *, rng: random.Random,
+                     target: int | None = None) -> Hint:
+    t = target if target is not None else _random_wrong_index(correct_index, n_options, rng)
     letter = index_to_letter(t)
     return Hint("simple", t, letter, f"<answer>{letter}</answer>")
 
@@ -169,10 +170,10 @@ COMPLEX_FAMILIES = {
 
 def make_complex_hint(
     correct_index: int, n_options: int, *, rng: random.Random,
-    family: str = DEFAULT_FAMILY, level: int = 1,
+    family: str = DEFAULT_FAMILY, level: int = 1, target: int | None = None,
 ) -> Hint:
     if family not in COMPLEX_FAMILIES:
         raise ValueError(f"unknown hint family {family!r}; known: {sorted(COMPLEX_FAMILIES)}")
-    target = _random_wrong_index(correct_index, n_options, rng)
-    body, decode = COMPLEX_FAMILIES[family](target, n_options, rng, level)
-    return Hint("complex", target, index_to_letter(target), f"<answer>{body}</answer>", decode)
+    t = target if target is not None else _random_wrong_index(correct_index, n_options, rng)
+    body, decode = COMPLEX_FAMILIES[family](t, n_options, rng, level)
+    return Hint("complex", t, index_to_letter(t), f"<answer>{body}</answer>", decode)
