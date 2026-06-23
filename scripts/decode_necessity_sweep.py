@@ -163,9 +163,10 @@ async def run_actor(name, args, reuse):
 
     for r in rows:
         r.pop("info", None)   # join data is large + redundant with the transcripts artifact
-    Path("logs").mkdir(exist_ok=True)
-    Path(f"logs/decode_necessity_{name}.json").write_text(
-        json.dumps({"meta": meta, "rows": rows}, indent=2, default=str))
+    if not args.dry:          # never persist tiny-N dry results — they'd poison the reuse cache glob
+        Path("logs").mkdir(exist_ok=True)
+        Path(f"logs/decode_necessity_{name}.json").write_text(
+            json.dumps({"meta": meta, "rows": rows}, indent=2, default=str))
     return meta
 
 
