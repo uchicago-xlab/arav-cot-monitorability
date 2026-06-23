@@ -47,6 +47,17 @@ actors:
     uplift_set: null
     experiments: [hints, gradient, oversight, followup_a]
     notes: "Open-weight faithful raw CoT; §4.4 summarization source; §7 RL base. prefill confirmed."
+
+  qwen3_30b:
+    id: openrouter/qwen/qwen3-30b-a3b-thinking-2507   # cheaper dev checkpoint of the qwen3-thinking family
+    provider: alibaba                               # AtlasCloud/fp8 was impractically slow (~10min/60gen); alibaba (quant unknown)
+    cot_access: native_raw
+    reasoning_enabled: true
+    tier: faithful_hints_gradient
+    necessity: todo
+    uplift_set: null
+    experiments: [hints, gradient, oversight, followup_a]
+    notes: "Terser dev alt to the 235b — evaluated for higher answer-yield (235b answered=0.63 @8k)."
   gpt_oss_120b:
     id: openrouter/openai/gpt-oss-120b
     provider: deepinfra/bf16                        # model has fp4..fp16 endpoints; pin bf16
