@@ -46,7 +46,7 @@ A task forces a model to externalize its reasoning **only if it exceeds that mod
 - **Follow-up C within-family ladder:** the **Flash lineage** (2.5 Flash → 3-flash-preview → 3.5-flash) where thinking disables — a clean faithful scaling ladder (confirm 3.5-flash disables; 2.5 Flash had reasoning=none).
 
 ## Stack & inference
-Python on **Inspect** (`inspect-ai`); use its current API. **All calls via OpenRouter** (`openrouter/<provider>/<model>` in `configs/models.yaml`; pin provider routing per model; log resolved provider). Reasoning via `include_reasoning` (raw `reasoning` for open weights; summarized/encrypted `reasoning_details` for closed). Caveats: reasoning often silently dropped in tool-calling mode → route reasoning into the **message body** for §6/Follow-up A; OpenRouter is inference-only. **GPT-5.5 config lock:** disable ONLY with `reasoning:{enabled:false}` — `effort:minimal` is WORSE (rtoks 49 vs default 28), `effort:low`=15, `exclude:true` only hides text (channel still active). SymPy for §3.2; numpy/pandas/matplotlib for figures.
+Python on **Inspect** (`inspect-ai`); use its current API. **All calls via OpenRouter** (`openrouter/<provider>/<model>` in `configs/models.yaml`; pin provider routing per model; log resolved provider). Reasoning via `include_reasoning` (raw `reasoning` for open weights; summarized/encrypted `reasoning_details` for closed). Caveats: reasoning often silently dropped in tool-calling mode → route reasoning into the **message body** for §6/Follow-up A; OpenRouter is inference-only. **GPT-5.5 config lock:** disable ONLY with `reasoning:{enabled:false}` — `effort:minimal` is WORSE (rtoks 49 vs default 28), `effort:low`=15, `exclude:true` only hides text (channel still active). SymPy for §3.2; numpy/pandas/matplotlib for figures. **Experiment tracking: Weights & Biases (`wandb`) for EVERYTHING** — every run logs config, scalar metrics, and a full per-rollout CoT table + transcript artifact so CoTs are auditable after the fact (schema in the active phase spec; helper `cot_mon/logging/wandb_logger.py`).
 
 ## Metrics (NOT uniform)
 - **§3.1:** unfaithfulness delta (hint-mention judge), on the **per-model** uplift set.
@@ -62,7 +62,8 @@ Python on **Inspect** (`inspect-ai`); use its current API. **All calls via OpenR
 - ALWAYS handle the GPQA canary; prefer held-out / newly authored items for necessity work.
 - Follow-up A dual-use task: bad action MUST be machine-indistinguishable from compliant — enforce via the action-only-recall-≈-FPR validity test.
 - §4.4: document the summarizer; test ≥2 styles + context-aware/blind; protect the concentration condition.
-- Cost caps + caching + dry-run before full runs. Log per run: model version, resolved provider, CoT-access mode (incl. `reasoning:{enabled:false}` for GPT-5.5), per-model necessity status, seed, dataset hash.
+- ALWAYS log every run to **WandB**: config (model slug, provider pin, CoT-access mode, N items, samples, seed, dataset hash, git SHA), scalar metrics with CIs, a **per-rollout CoT table** (full prompt, full reasoning trace, final + extracted answer, judge verdict + rationale), and a `transcripts.jsonl` artifact as the source of truth. NEVER commit the `WANDB_API_KEY` (`.env`).
+- Cost caps + caching + dry-run before full runs.
 
 ## Key decisions to respect
 - FPR calibration is a **rigor correction**, not a novel method.
@@ -71,3 +72,5 @@ Python on **Inspect** (`inspect-ai`); use its current API. **All calls via OpenR
 
 ## Where to start
 **§3.1 first** (single-turn, fully specified, cheapest; exercises model layer + autorater + GPQA loader + the per-model uplift filter that §6 reuses). Build it on **Gemini-3-flash-preview** (the confirmed faithful actor). Then §3.2 (+ necessity-threshold sweep / Follow-up C) → §6 → §4.4 → Follow-up A. See SPEC §6.
+
+**ACTIVE PHASE:** the current execution spec is `SPEC_phase2.md` — close Gate 1 (powered §3.1, 60 items × 10 samples), build §3.2 + Follow-up C, and add WandB logging across the board. Work from it; SPEC.md remains the overall blueprint.
