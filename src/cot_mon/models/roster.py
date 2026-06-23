@@ -156,11 +156,36 @@ def build_model(
     return get_model(e.id, config=config or GenerateConfig(), **margs)
 
 
+def judged_cot_source(cot_access: str | None) -> str:
+    """Which part of a `generate()` output holds this actor's REAL reasoning trace — the field the
+    §3.1 judge must read (channel-aware capture; SPEC_phase2 §2.1):
+
+      native_raw            -> "reasoning"  open weights: raw CoT in the `reasoning` field
+                                            (Inspect surfaces it as a ContentReasoning block,
+                                            separate from `.completion`)
+      body_channel/disabled -> "body"       Gemini thinking-disabled / GPT-5.5 channel-off: the CoT
+                                            IS the message body (`.completion`)
+      summary / None        -> "none"       mandatory hidden channel / summary-only — NOT judgeable
+                                            (judging it would measure the summary's faithfulness)
+    """
+    if cot_access == NATIVE_RAW:
+        return "reasoning"
+    if cot_access in (BODY_CHANNEL, DISABLED):
+        return "body"
+    return "none"
+
+
+def is_judgeable(name: str, *, path: Path | str = DEFAULT_CONFIG) -> bool:
+    """True iff this actor exposes a raw trace we can read for §3.1 (native_raw or body/disabled)."""
+    return judged_cot_source(get_entry(name, path=path).cot_access) != "none"
+
+
 def describe(name: str, *, path: Path | str = DEFAULT_CONFIG) -> dict[str, Any]:
     """Per-run log record (CLAUDE.md: log provider + mode + necessity)."""
     e = get_entry(name, path=path)
     return {
         "name": e.name, "id": e.id, "provider": e.provider,
-        "cot_access": e.cot_access, "reasoning_enabled": e.reasoning_enabled,
+        "cot_access": e.cot_access, "cot_source": judged_cot_source(e.cot_access),
+        "reasoning_enabled": e.reasoning_enabled,
         "tier": e.tier, "necessity": e.necessity, "uplift_set": e.uplift_set,
     }

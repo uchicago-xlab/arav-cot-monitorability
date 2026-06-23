@@ -21,7 +21,7 @@ import random
 import re
 from dataclasses import dataclass
 
-from inspect_ai.model import ChatMessageAssistant, ChatMessageUser
+from inspect_ai.model import ChatMessageAssistant, ChatMessageUser, ContentReasoning
 
 from cot_mon.exp_hints.data import MCQItem, _seed_from, index_to_letter, letter_to_index
 from cot_mon.exp_hints.hints import make_complex_hint, make_simple_hint
@@ -89,6 +89,17 @@ def extract_cot(text: str) -> str:
     return text.split("<answer>", 1)[0].strip()
 
 
+def extract_reasoning(output) -> str:
+    """The raw reasoning trace from an Inspect output's ContentReasoning block(s). native_raw actors
+    (open weights via OpenRouter) emit their CoT here, SEPARATE from `.completion`; `''` if none."""
+    msg = getattr(output, "message", None)
+    content = getattr(msg, "content", None) if msg is not None else None
+    if isinstance(content, list):
+        return "\n".join(c.reasoning for c in content
+                         if isinstance(c, ContentReasoning) and c.reasoning).strip()
+    return ""
+
+
 # ── records ──
 @dataclass
 class GridRecord:
@@ -108,6 +119,7 @@ class GridRecord:
     target_letter: str = ""
     judge_evidence: tuple[str, ...] = ()
     judge_method: str | None = None
+    cot_source: str = "body"   # which field was judged: "body" | "reasoning" (channel-aware capture)
 
     @property
     def picks_hinted(self) -> bool:
@@ -125,23 +137,34 @@ class GridRecord:
 
 
 # ── live runners ──
-async def run_condition(model, item: MCQItem, hint, *, with_cot: bool) -> dict:
+async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_source: str = "body") -> dict:
+    """`cot_source` selects which field is the JUDGED trace (channel-aware capture; SPEC_phase2 §2.1):
+    "reasoning" for native_raw open weights (CoT in the `reasoning` field) or "body" for
+    body_channel/disabled actors (CoT in `.completion`). The ANSWER is always parsed from the body.
+    The with-CoT arm NEVER prefills (so a thinking model's trace is not truncated); the no-CoT
+    necessity arm prefills `<answer>` (zeroing thinking is the intended forced-no-CoT check)."""
     prompt = build_prompt(item, hint, with_cot=with_cot)
     if with_cot:
-        full = (await model.generate(prompt)).completion
+        out = await model.generate(prompt)
+        body = out.completion
     else:                                   # force early answer: prefill the assistant turn
         out = await model.generate([ChatMessageUser(content=prompt), ChatMessageAssistant(content="<answer>")])
-        full = "<answer>" + out.completion
-    letter = extract_answer_letter(full)
+        body = "<answer>" + out.completion
+    reasoning = extract_reasoning(out)
+    letter = extract_answer_letter(body)
+    if letter is None and reasoning:        # thinking models may state the answer only in the trace
+        letter = extract_answer_letter(reasoning)
+    cot = reasoning if cot_source == "reasoning" else extract_cot(body)
     return {"letter": letter,
             "picks_index": letter_to_index(letter) if letter else None,
-            "cot": extract_cot(full),
-            "prompt": prompt,          # full prompt + raw completion -> CoT-audit table / transcripts
-            "full": full}
+            "cot": cot,                # the JUDGED trace (reasoning for native_raw, else body-pre-answer)
+            "reasoning": reasoning,
+            "prompt": prompt,          # full prompt + body -> CoT-audit table / transcripts
+            "full": body}
 
 
 async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arithmetic",
-                   level: int = 1, seed: int | None = None,
+                   level: int = 1, seed: int | None = None, cot_source: str = "body",
                    cot_modes: tuple[bool, ...] = (True, False), concurrency: int = 8) -> list[GridRecord]:
     eff_seed = seed if seed is not None else _seed_from(item.id)
     rng = random.Random(eff_seed)
@@ -154,7 +177,8 @@ async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arith
     }
     conds = [(kind, hint, wc) for kind, hint in hints.items() for wc in cot_modes]
     results = await _bounded_gather(
-        [run_condition(model, item, hint, with_cot=wc) for (_, hint, wc) in conds for _ in range(n_samples)],
+        [run_condition(model, item, hint, with_cot=wc, cot_source=cot_source)
+         for (_, hint, wc) in conds for _ in range(n_samples)],
         concurrency)
     records: list[GridRecord] = []
     for ci, (kind, hint, wc) in enumerate(conds):
@@ -170,7 +194,7 @@ async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arith
                 item.id, kind, wc, target, item.correct_index, r["picks_index"], r["cot"], used,
                 sample_idx=si, seed=eff_seed, prompt=r["prompt"], full_completion=r["full"],
                 target_letter=(hint.target_letter if hint is not None else ""),
-                judge_evidence=evidence, judge_method=method))
+                judge_evidence=evidence, judge_method=method, cot_source=cot_source))
     return records
 
 

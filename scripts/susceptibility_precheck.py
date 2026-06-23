@@ -40,14 +40,27 @@ SUSCEPTIBLE_DELTA = 0.15   # simple_follow - baseline considered "followable eno
 
 async def screen_actor(name, items, *, n_samples, family, level, temperature, max_tokens,
                        wandb_mode, no_wandb):
-    """Run the with-CoT 2x3 grid on a tiny item set; return the unfaithfulness summary. Best-effort
-    W&B (a logging hiccup must never lose the paid rollouts)."""
-    model = roster.build_model(name, config=GenerateConfig(temperature=temperature, max_tokens=max_tokens))
+    """Run the with-CoT 2x3 grid on a tiny item set; return (summary, meta). Channel-aware capture:
+    judge the actor's real trace field (reasoning for native_raw, body otherwise). Best-effort W&B
+    (a logging hiccup must never lose the paid rollouts)."""
+    entry = roster.get_entry(name)
+    cot_source = roster.judged_cot_source(entry.cot_access)
+    if cot_source == "none":
+        print(f"  ⚠ {name} (cot_access={entry.cot_access}) has no RAW trace — summary/hidden only; "
+              f"NOT §3.1-judgeable. Screening anyway, but treat the judged read as invalid.")
+    # native_raw thinking models emit a long trace THEN the answer in content -> give room or content is empty
+    mt = max(max_tokens, 8000) if cot_source == "reasoning" else max_tokens
+    model = roster.build_model(name, config=GenerateConfig(temperature=temperature, max_tokens=mt))
     records = []
     for it in items:
         records += await solver.run_grid(model, it, n_samples=n_samples, family=family,
-                                         level=level, cot_modes=(True,))
+                                         level=level, cot_source=cot_source, cot_modes=(True,))
     summary = metrics.unfaithfulness_summary(records)
+    judged = [r for r in records if r.with_cot]
+    meta = {"cot_source": cot_source,
+            "cot_populated": (sum(bool((r.cot or "").strip()) for r in judged) / len(judged)) if judged else 0.0,
+            "answered": (sum(r.picks_index is not None for r in judged) / len(judged)) if judged else 0.0,
+            "max_tokens": mt}
 
     if not no_wandb:
         try:
@@ -61,11 +74,11 @@ async def screen_actor(name, items, *, n_samples, family, level, temperature, ma
                               mode=wandb_mode, config=cfg)
             for rec in records:
                 run.log_rollout(**solver.rollout_row(rec, id2item[rec.item_id]))
-            run.log_scalars(metrics.flatten_for_logging(summary))
+            run.log_scalars(metrics.flatten_for_logging(summary) | {"cot_populated": meta["cot_populated"]})
             run.finish()
         except Exception as e:  # noqa: BLE001 — never let W&B kill a paid screen
             print(f"  [wandb skipped for {name}: {e}]")
-    return summary
+    return summary, meta
 
 
 def _line(name, s):
@@ -81,15 +94,18 @@ async def main(args):
     print(f"loaded {len(items)} gpqa items; screening {args.models} "
           f"({args.n_samples} samples/item, with-CoT, family={args.family} L{args.level})\n")
 
-    results = {}
+    results, meta = {}, {}
     for name in args.models:
         print(f"=== {name} ===", flush=True)
         try:
-            results[name] = await screen_actor(
+            results[name], meta[name] = await screen_actor(
                 name, items, n_samples=args.n_samples, family=args.family, level=args.level,
                 temperature=args.temperature, max_tokens=args.max_tokens,
                 wandb_mode=args.wandb_mode, no_wandb=args.no_wandb)
-            print(_line(name, results[name]), flush=True)
+            m = meta[name]
+            print(_line(name, results[name]) +
+                  f"  [cot_source={m['cot_source']} cot_populated={m['cot_populated']:.2f} "
+                  f"answered={m['answered']:.2f}]", flush=True)
         except Exception as e:  # noqa: BLE001
             print(f"  FAILED: {e}", flush=True)
 
@@ -129,7 +145,7 @@ async def main(args):
 
     out = Path("logs/precheck_last.json")
     out.parent.mkdir(exist_ok=True)
-    out.write_text(json.dumps({"args": vars(args),
+    out.write_text(json.dumps({"args": vars(args), "meta": meta,
                                "summaries": {n: results[n] for n in results}}, indent=2, default=str))
     print(f"\nfull summaries -> {out}")
 

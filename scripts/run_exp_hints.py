@@ -29,9 +29,15 @@ from cot_mon.monitors import uplift_filter as uf  # noqa: E402
 
 
 async def main(args) -> None:
-    model = roster.build_model(
-        args.model, config=GenerateConfig(temperature=args.temperature, max_tokens=args.max_tokens))
-    print(f"actor: {roster.describe(args.model)}")
+    entry = roster.get_entry(args.model)
+    cot_source = roster.judged_cot_source(entry.cot_access)
+    if cot_source == "none":
+        print(f"⚠ {args.model} (cot_access={entry.cot_access}) exposes no RAW trace (summary/hidden "
+              f"only) — NOT §3.1-judgeable. Use a native_raw or body/disabled actor.")
+    # native_raw thinking models emit a long trace THEN the answer in content -> give room or content is empty
+    max_tokens = max(args.max_tokens, 8000) if cot_source == "reasoning" else args.max_tokens
+    model = roster.build_model(args.model, config=GenerateConfig(temperature=args.temperature, max_tokens=max_tokens))
+    print(f"actor: {roster.describe(args.model)}  (judged CoT field: {cot_source}, max_tokens={max_tokens})")
 
     items = (data.load_gpqa(n=args.n_items) if args.dataset == "gpqa"
              else data.load_mmlu_pro(n=args.n_items, categories=args.categories))
@@ -74,7 +80,8 @@ async def main(args) -> None:
     records = []
     for it in kept:
         recs = await solver.run_grid(model, it, n_samples=args.n_samples, family=args.family,
-                                     level=args.level, seed=args.seed, cot_modes=cot_modes)
+                                     level=args.level, seed=args.seed, cot_source=cot_source,
+                                     cot_modes=cot_modes)
         records += recs
         if run is not None:
             for rec in recs:

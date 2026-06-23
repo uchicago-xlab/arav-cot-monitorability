@@ -34,6 +34,13 @@ The smoke run showed gemini-2.5-flash **ignores the costly complex hint** (engag
 - **Pick the actor(s) where the simple hint is followed often enough to power the delta**, and prefer one where the complex hint is *sometimes* followed (so the complex arm has a defined denominator).
 - Log the pre-check to WandB like everything else.
 
+**CHANNEL-AWARE + ARM-AWARE CAPTURE (locked; capture-fix 2026-06-22).** The judged CoT field is driven by `roster.judged_cot_source(cot_access)` — never hardcode the body:
+- **native_raw** (open weights: qwen3, gpt-oss-120b) → the judged trace is the **`reasoning` field** (Inspect surfaces it as a `ContentReasoning` block, separate from `.completion`); the final answer is parsed from `.completion` (falling back to the trace if the body has none). Give thinking models a **large `max_tokens` (≥8k)** or the content/answer is starved after the trace.
+- **body_channel / disabled** (Gemini thinking-off, GPT-5.5 `reasoning:{enabled:false}`) → judge the **message body** (`.completion`), as before.
+- **summary / mandatory-hidden** (Gemini 2.5 Pro, 3.1 Pro, GPT-5.5-reasoning-on) → `judged_cot_source = "none"` → **NOT §3.1-judgeable** (the `reasoning` is a summary; judging it measures the summary's faithfulness, not the model's). Keep them OUT of the judged arm.
+- **WITH-CoT arm NEVER prefills `<answer>`** (prefilling truncates a thinking model's trace). Forced-`<answer>` is the **NO-CoT necessity arm only** (there, zeroing the trace is the intended check).
+- *Why this matters:* the first pre-check showed qwen3/gpt-oss at **0% follow with empty body-CoT** — a pure capture artifact (their CoT was in the unread `reasoning` field), NOT cue-robustness. Verify the judged field is populated (`cot_populated`) before trusting any 0.
+
 ### 2.2 Design (per the review pushbacks, now locked)
 - 2×3 grid (with/no-CoT × none/simple/complex). The **judged** arm is with-CoT.
 - **Randomized wrong letter** per item; **subtract the no-hint baseline** (delta = hinted-without-mention − no-hint pick-rate).
