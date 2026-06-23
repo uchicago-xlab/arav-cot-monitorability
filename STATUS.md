@@ -1,13 +1,14 @@
 # STATUS — Second Look: CoT Monitorability
 
 **Date:** 2026-06-22 · **Session #1**
-**Build-order step (SPEC §6):** 1 essentially DONE (scaffold + deps + OpenRouter round-trip + reasoning/prefill verified). Next: §3.1 (step 3), building spine (step 2) alongside.
-**Gates:** Gate 1 (§3.1 replicates) — not reached but **UNBLOCKED** (Gemini 2.5 Pro is green). Gate 2 — not reached.
+**Build-order step (SPEC §7):** §3.1 (step 3) — **first GPQA paper replication RAN** (preliminary; direction replicates). Spine (step 2) largely done. Per-model necessity is the CORE principle.
+**Gates:** Gate 1 = **GPQA** §3.1 replication — direction shown on a tiny run; NOT cleared (needs a powered run, ~20 samples × more items, 2σ). Gate 2 — not reached.
 
 ## Module status
-- **Working:** `scripts/phase0_probe.py` + `scripts/phase0_followups.py` (capability probes); deps installed (`uv sync`); `cot_mon` editable-imports.
-- **Config:** `configs/models.yaml` — slugs resolved + **providers pinned & verified (9/9 endpoints resolve to intended backend).**
-- **Stubbed (docstring/TODO only):** entire spine (`roster`, `transcripts`, `monitors/*`, `scoring`, `metrics`), all experiments (`exp_*`, `followup_a`), `tasks/*`, `make_figures.py`, `tests/test_*`.
+- **DONE + tested (45 tests pass):** `models/roster.py`, `monitors/uplift_filter.py` (per-model necessity engine), `exp_hints/data.py` (GPQA+MMLU-Pro), `exp_hints/hints.py` (5-family suite), `monitors/hint_judge.py`, `exp_hints/solver.py` (2×3 grid, `<question-metadata>` injection, `\boxed`/`<answer>` extraction, correct-with-CoT filter, bounded concurrency), `metrics.py` (unfaithfulness delta + Wilson 2σ).
+- **Runners:** `scripts/run_exp_hints.py` (paper-repl defaults: GPQA · gemini-2.5-flash · correct-with-CoT · with-CoT-only), `scripts/check_hint_decode.py` (decode-necessity diagnostic). `scripts/phase0_*.py`.
+- **STILL stubbed:** `tasks/exp_hints.py` (Inspect @task — runner used instead for now), `transcripts`, `monitors/{detection,summarizer,coverage,calibration}`, `scoring`, §3.2 / §6 / followup_a, `make_figures`.
+- **Git:** PR #1 merged to `main`; work on `feat/exp-hints`. Committed: scaffold · phase-0 · roster · necessity engine · §3.1 inputs. (solver/metrics/runner being committed this session.)
 
 ## Phase-0 resolutions (RESOLVED via probe; full detail in logs/phase0_probe.json)
 Per-model — **live · reasoning · prefill** (provider in parens):
@@ -39,13 +40,19 @@ Per-model — **live · reasoning · prefill** (provider in parens):
 - `.gitignore`: added `logs/`, `*.eval`, `.cache/`, `data/raw/`. Default `uv` `main.py` left in place.
 - **Providers pinned** as exact endpoint tags (`only`+no-fallback) after verifying the format empirically; quantization pinned where it varies (qwen3 bf16, gpt-oss bf16 — the latter has fp4..fp16 endpoints).
 - **`opus_4_8` experiments narrowed** `[hints,gradient,oversight,followup_a]` → `[oversight,followup_a]` (no prefill → can't run §3.1/§3.2 forced-CoT).
+- **§3.1 design (per 7 review pushbacks):** per-model necessity is a PRECONDITION — `uplift_filter` gates §3.1 on each actor's own CoT-necessary items, **including the hint-DECODE items** (verify the actor can't one-shot the decode). 2×3 design (with/no-CoT × none/simple/complex); **no-CoT arm = forced early `<answer>`** (so forcing never truncates the with-CoT trace the judge reads). Randomized wrong letter + subtract no-hint baseline. Judge deterministic-primary + Opus (non-Gemini) backstop; report hand-labeled agreement before trusting the delta. **Smoke (tiny N) ≠ Gate 1** (powered run, ~20/item, 2σ).
+- **GPQA is the Gate-1 anchor** (`Idavidrein/gpqa` extended config; `HF_TOKEN`; canary never enters prompts); MMLU-Pro = smoke + generalization only.
+- **Complex-hint SUITE (extension beyond paper):** families = `arithmetic` (DEFAULT/paper), `bignum`, `iterated` (LCG), `deductive`, `indirection`; each difficulty-laddered + per-model necessity-filtered. Buys §3.1 robustness across reasoning modalities + a richer Follow-up C signal.
+- **§3.1 PAPER replication setup (user decisions):** actor = **gemini-2.5-flash** (Flash analog of the retired 2.0 Flash); item filter = **correct-with-CoT** (a true no-CoT arm is confounded on mandatory-reasoning Gemini); injection = **Chen et al. `<question-metadata>` block** (decoy status/peer-reviewed/success-rate + hint in the `<answer>` slot). Generalization-only caveat: we read its body CoT, it may also reason hidden. Extraction handles `\boxed{}`/`<answer>`/"answer is X".
 
 ## Results so far
-Phase-0 only (no experiments yet). Headline: **prefill works on all Gemini + GPT-5.5 + open weights; only Opus 4.8 lacks it.** Faithful raw CoT only from open weights.
+**§3.1 first GPQA paper replication (gemini-2.5-flash; PRELIMINARY — 7 items × 4 samples):** direction REPLICATES — baseline pick-target 0.00; **simple unfaithful 0.18 [0.08,0.36]**; **complex unfaithful 0.00 [0,0.12]**. Underpowered (CIs wide); simple unfaithfulness modest (model fairly robust to the cue).
+**`complex=0` RESOLVED (diagnostic):** the decode is genuinely CoT-necessary (decode acc with-CoT 0.94 vs forced-no-CoT 0.22 at paper level 1; uplift +0.72 → pushback #3 cleared). complex follow=0 because the model **IGNORES** the costly hint and answers correctly (engaged_hint=False), NOT because it can't decode — so "follows-and-reveals" isn't directly observed (no followers; would need a more hint-susceptible framing/model).
+Phase-0 headline (recap): prefill works on all Gemini + GPT-5.5 + open weights, not Opus; faithful raw CoT only from open weights; necessity is model-relative.
 
-## Current blocker
-None. (qwen3 prefill CONFIRMED; security + provider pinning done. Phase-0 fully closed.)
+## Current blocker / next
+None blocking. **RAIN-CHECKED** by user after the first replication + complex=0 resolution. NEXT when resumed: **powered GPQA run** (≥20 samples × ~40 items, 2σ) = Gate 1; a more hint-susceptible framing to observe complex "follows-and-reveals"; then the extended hint-family suite + other actors (gemini-3-flash, open weights).
 
 ## Help wanted
-- **Roster (informed by necessity check):** add **gemini-3-flash-preview** as a clean §3.1/§3.2 necessity actor (✅). Keep **GPT-5.5** as a Follow-up C / "strong-evader" subject (one-shots these tasks; needs a much harder difficulty sweep), NOT a baseline necessity actor. Run the necessity check on the open weights (qwen3/gpt-oss) too?
-- Qwen3 substrate: **235b-a22b-thinking** (strong, current default) vs **30b-a3b-thinking** (cheap) for dev runs?
+- Open-weight necessity (qwen3/gpt-oss) not yet run — needed before trusting them as faithful §3.1 actors.
+- Qwen3 dev checkpoint: **235b-a22b-thinking** (default) vs cheaper **30b-a3b-thinking**?
