@@ -43,3 +43,18 @@ def test_measure_with_fake_sampler():
     assert res[0].pass_cot == 1.0
     assert res[0].pass_nocot == 0.0
     assert res[0].uplift == 1.0
+
+
+def test_measure_concurrency_matches_sequential_and_preserves_order():
+    # decode-necessity sweep runs items concurrently; results + order must be identical to sequential.
+    items = [uf.UpliftItem(f"q{i}", f"p{i}", lambda a, i=i: a == f"ok{i}") for i in range(6)]
+
+    async def sampler(prompt: str, allow_cot: bool) -> str:
+        await asyncio.sleep(0)                      # force interleaving under gather
+        idx = prompt[1:]
+        return f"ok{idx}" if allow_cot else "no"    # CoT-necessary for every item
+
+    seq = asyncio.run(uf.measure(items, sampler, n_samples=4, concurrency=1))
+    conc = asyncio.run(uf.measure(items, sampler, n_samples=4, concurrency=4))
+    assert [r.id for r in conc] == [r.id for r in seq] == [f"q{i}" for i in range(6)]
+    assert all(c.pass_cot == 1.0 and c.pass_nocot == 0.0 for c in conc)

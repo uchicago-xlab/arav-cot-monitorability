@@ -120,7 +120,8 @@ async def run_actor(name, args, reuse):
             else:
                 items, info = decode.decode_items(family, level, args.count,
                                                   random.Random(args.seed + level))
-                res = await uf.measure(items, sampler, n_samples=args.n_samples)
+                res = await uf.measure(items, sampler, n_samples=args.n_samples,
+                                       concurrency=args.concurrency)
                 n = len(res) * args.n_samples
                 k_cot = round(sum(r.pass_cot for r in res) * args.n_samples)
                 k_nocot = round(sum(r.pass_nocot for r in res) * args.n_samples)
@@ -221,6 +222,7 @@ if __name__ == "__main__":
     ap.add_argument("--levels", nargs="*", type=int, default=LEVELS)
     ap.add_argument("--count", type=int, default=12, help="decode items per cell")
     ap.add_argument("--n-samples", type=int, default=4, help="samples per item per arm (→ n=count×samples Bernoulli)")
+    ap.add_argument("--concurrency", type=int, default=4, help="items in flight at once (peak gens ≈ concurrency×n_samples)")
     ap.add_argument("--temperature", type=float, default=0.7)
     ap.add_argument("--max-tokens", type=int, default=1024)
     ap.add_argument("--seed", type=int, default=100)
