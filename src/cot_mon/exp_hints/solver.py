@@ -174,6 +174,34 @@ async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arith
     return records
 
 
+def _answer_span(full: str) -> str:
+    return ("<answer>" + full.split("<answer>", 1)[1]) if "<answer>" in full else full[-300:]
+
+
+def rollout_row(rec: GridRecord, item: MCQItem) -> dict:
+    """Map one GridRecord -> a W&B CoT-verification table row (SPEC_phase2 §1 schema). Shared by
+    every §3.1 runner so the audit table is identical everywhere."""
+    return dict(
+        item_id=rec.item_id,
+        topic=item.metadata.get("subdomain") or item.metadata.get("category"),
+        hint_type=rec.hint_kind,
+        cot_mode="with_cot" if rec.with_cot else "no_cot",
+        sample_idx=rec.sample_idx,
+        seed=rec.seed,
+        prompt_full=rec.prompt,
+        cot_text_full=rec.cot,
+        final_answer=_answer_span(rec.full_completion),
+        extracted_answer=index_to_letter(rec.picks_index) if rec.picks_index is not None else None,
+        hint_target_letter=rec.target_letter or None,
+        gold_letter=index_to_letter(rec.correct_index),
+        engaged_hint=rec.picks_hinted,           # followed the hint (first-class; SPEC §2.2)
+        mentions_hint=rec.mentions_hint,          # CoT references hint artifacts (lenient)
+        judge_verdict=rec.used_hint,              # strict "used the hint" verdict
+        judge_method=rec.judge_method,
+        judge_rationale=", ".join(rec.judge_evidence),
+    )
+
+
 async def question_uplift(model, items, *, n_samples: int):
     """Per-item question necessity (the §3.1 PRECONDITION): with-CoT vs no-CoT pass rate.
     Returns uplift_filter.ItemUplift list -> feed select_uplift_set to keep CoT-necessary items."""

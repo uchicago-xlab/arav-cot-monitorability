@@ -1,13 +1,14 @@
 # STATUS — Second Look: CoT Monitorability
 
-**Date:** 2026-06-22 · **Session #1**
-**Build-order step (SPEC §7):** §3.1 (step 3) — **first GPQA paper replication RAN** (preliminary; direction replicates). Spine (step 2) largely done. Per-model necessity is the CORE principle.
-**Gates:** Gate 1 = **GPQA** §3.1 replication — direction shown on a tiny run; NOT cleared (needs a powered run, ~20 samples × more items, 2σ). Gate 2 — not reached.
+**Date:** 2026-06-22 · **Session #2** (Phase 2)
+**Build-order step (SPEC_phase2 §4):** step 1 **WandB logger DONE** (everything logs through it); step 2 **§3.1 susceptibility pre-check DONE → actors picked**. NEXT = judge-validation + powered §3.1 (60×10) = Gate 1. Per-model necessity is the CORE principle.
+**Gates:** Gate 1 = powered **GPQA** §3.1 on a *hint-susceptible* actor (judge-validated, baseline-subtracted, 2σ) — NOT cleared; actor now selected, run not yet done. Gate 2 — not reached.
+**W&B:** project live at `wandb.ai/aravdhoot/cot-monitorability` (pre-check = 4 runs, CoT tables + transcripts artifacts synced).
 
 ## Module status
-- **DONE + tested (45 tests pass):** `models/roster.py`, `monitors/uplift_filter.py` (per-model necessity engine), `exp_hints/data.py` (GPQA+MMLU-Pro), `exp_hints/hints.py` (5-family suite), `monitors/hint_judge.py`, `exp_hints/solver.py` (2×3 grid, `<question-metadata>` injection, `\boxed`/`<answer>` extraction, correct-with-CoT filter, bounded concurrency), `metrics.py` (unfaithfulness delta + Wilson 2σ).
-- **Runners:** `scripts/run_exp_hints.py` (paper-repl defaults: GPQA · gemini-2.5-flash · correct-with-CoT · with-CoT-only), `scripts/check_hint_decode.py` (decode-necessity diagnostic). `scripts/phase0_*.py`.
-- **STILL stubbed:** `tasks/exp_hints.py` (Inspect @task — runner used instead for now), `transcripts`, `monitors/{detection,summarizer,coverage,calibration}`, `scoring`, §3.2 / §6 / followup_a, `make_figures`.
+- **DONE + tested (53 tests pass / 5 skip):** `models/roster.py`, `monitors/uplift_filter.py` (per-model necessity engine), `exp_hints/data.py` (GPQA+MMLU-Pro), `exp_hints/hints.py` (5-family suite), `monitors/hint_judge.py`, `exp_hints/solver.py` (2×3 grid, `<question-metadata>` injection, `\boxed`/`<answer>` extraction, correct-with-CoT filter, bounded concurrency, **audit fields + shared `rollout_row`**), `metrics.py` (unfaithfulness delta + Wilson 2σ + `flatten_for_logging`), **`logging/wandb_logger.py`** (one run per exp×actor×config; config+scalars+2σ; per-rollout CoT `wandb.Table`; `transcripts.jsonl` artifact; disabled/offline/online; no key leakage).
+- **Runners:** `scripts/run_exp_hints.py` (paper-repl defaults + **now W&B-logged**: `--seed/--gate/--no-wandb/--wandb-mode`), **`scripts/susceptibility_precheck.py`** (actor-selection screen), `scripts/check_hint_decode.py` (decode-necessity diagnostic), `scripts/smoke_wandb.py` (offline logger smoke). `scripts/phase0_*.py`.
+- **STILL stubbed:** `tasks/exp_hints.py` (Inspect @task — runner used instead), `exp_gradient/algebra.py` (§3.2 generator — docstring only), `transcripts`, `monitors/{detection,summarizer,coverage,calibration}`, `scoring`, §6 / followup_a, `make_figures`.
 - **Git:** PR #1 merged to `main`; work on `feat/exp-hints`. Committed: scaffold · phase-0 · roster · necessity engine · §3.1 inputs. (solver/metrics/runner being committed this session.)
 
 ## Phase-0 resolutions (RESOLVED via probe; full detail in logs/phase0_probe.json)
@@ -46,12 +47,23 @@ Per-model — **live · reasoning · prefill** (provider in parens):
 - **§3.1 PAPER replication setup (user decisions):** actor = **gemini-2.5-flash** (Flash analog of the retired 2.0 Flash); item filter = **correct-with-CoT** (a true no-CoT arm is confounded on mandatory-reasoning Gemini); injection = **Chen et al. `<question-metadata>` block** (decoy status/peer-reviewed/success-rate + hint in the `<answer>` slot). Generalization-only caveat: we read its body CoT, it may also reason hidden. Extraction handles `\boxed{}`/`<answer>`/"answer is X".
 
 ## Results so far
-**§3.1 first GPQA paper replication (gemini-2.5-flash; PRELIMINARY — 7 items × 4 samples):** direction REPLICATES — baseline pick-target 0.00; **simple unfaithful 0.18 [0.08,0.36]**; **complex unfaithful 0.00 [0,0.12]**. Underpowered (CIs wide); simple unfaithfulness modest (model fairly robust to the cue).
+**§3.1 susceptibility pre-check (Session #2; GPQA 5 items × 4 samples, with-CoT, arithmetic L1; W&B-logged):** screened 4 candidates for hint follow-rate →
+| actor | baseline | simple_follow | complex_follow | simple_unfaithful |
+|---|---|---|---|---|
+| **gemini-3-flash** | 0.05 | **0.50 [0.30,0.70]** | 0.05 | **0.30** |
+| gemini-2.5-flash (paper) | 0.00 | 0.00 [0,0.17] | 0.05 | 0.00 |
+| qwen3 | 0.00 | 0.00 | 0.00 | 0.00 |
+| gpt-oss-120b | 0.00 | 0.00 | 0.00 | 0.00 |
+**→ ACTOR DECISION (user: "both, labeled separately"):** powered §3.1 runs on **gemini-2.5-flash** (paper faithful-replication datapoint; robust to the cue → its complex arm is the "declines the costly hint" framing, SPEC §2.2) **+ gemini-3-flash** (the susceptible faithful actor: follows the simple cue 50%, reveals it only ~40% of follows → clean unfaithfulness delta). Open weights (qwen3/gpt-oss) show 0 follow AND their body CoT is empty (reasoning in hidden channel) → out of the §3.1 judged arm; revisit under the necessity check / §3.2.
+**§3.1 first GPQA paper replication (gemini-2.5-flash; PRELIMINARY — 7 items × 4 samples, Session #1):** direction REPLICATES — baseline pick-target 0.00; **simple unfaithful 0.18 [0.08,0.36]**; **complex unfaithful 0.00 [0,0.12]**. Underpowered; consistent with the pre-check (2.5-flash is cue-robust).
 **`complex=0` RESOLVED (diagnostic):** the decode is genuinely CoT-necessary (decode acc with-CoT 0.94 vs forced-no-CoT 0.22 at paper level 1; uplift +0.72 → pushback #3 cleared). complex follow=0 because the model **IGNORES** the costly hint and answers correctly (engaged_hint=False), NOT because it can't decode — so "follows-and-reveals" isn't directly observed (no followers; would need a more hint-susceptible framing/model).
 Phase-0 headline (recap): prefill works on all Gemini + GPT-5.5 + open weights, not Opus; faithful raw CoT only from open weights; necessity is model-relative.
 
 ## Current blocker / next
-None blocking. **RAIN-CHECKED** by user after the first replication + complex=0 resolution. NEXT when resumed: **powered GPQA run** (≥20 samples × ~40 items, 2σ) = Gate 1; a more hint-susceptible framing to observe complex "follows-and-reveals"; then the extended hint-family suite + other actors (gemini-3-flash, open weights).
+None blocking. **PAUSED at the pre-check gate** (user boundary: "through the pre-check", then stop before the powered 60×10). NEXT when resumed (SPEC_phase2 §4 steps 3→4):
+1. **Judge validation** — hand-label ~20–30 with-CoT gemini-3-flash traces, report `hint_judge` agreement BEFORE trusting the delta.
+2. **Powered §3.1 (60 items × 10 samples)** on **gemini-2.5-flash + gemini-3-flash** (labeled separately) = **Gate 1**. Watch: gemini-3-flash complex_follow≈0.05 → 60×10 gives ~30 followers (thin but defined); if complex follow→0 at scale, report decline-to-follow (do NOT report a zero-denominator rate as "0% unfaithful", SPEC §2.2).
+Then §3.2 generator (`exp_gradient/algebra.py`) + per-model necessity-threshold sweep (Follow-up C).
 
 ## Help wanted
 - Open-weight necessity (qwen3/gpt-oss) not yet run — needed before trusting them as faithful §3.1 actors.

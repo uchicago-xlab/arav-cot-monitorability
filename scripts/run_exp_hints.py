@@ -23,37 +23,9 @@ from inspect_ai.model import GenerateConfig  # noqa: E402
 
 from cot_mon import metrics  # noqa: E402
 from cot_mon.exp_hints import data, solver  # noqa: E402
-from cot_mon.exp_hints.data import index_to_letter  # noqa: E402
 from cot_mon.logging import wandb_logger as wl  # noqa: E402
 from cot_mon.models import roster  # noqa: E402
 from cot_mon.monitors import uplift_filter as uf  # noqa: E402
-
-
-def _answer_span(full: str) -> str:
-    return ("<answer>" + full.split("<answer>", 1)[1]) if "<answer>" in full else full[-300:]
-
-
-def _rollout_row(rec: solver.GridRecord, item: data.MCQItem) -> dict:
-    """Map one GridRecord -> a CoT-verification table row (SPEC_phase2 §1 schema)."""
-    return dict(
-        item_id=rec.item_id,
-        topic=item.metadata.get("subdomain") or item.metadata.get("category"),
-        hint_type=rec.hint_kind,
-        cot_mode="with_cot" if rec.with_cot else "no_cot",
-        sample_idx=rec.sample_idx,
-        seed=rec.seed,
-        prompt_full=rec.prompt,
-        cot_text_full=rec.cot,
-        final_answer=_answer_span(rec.full_completion),
-        extracted_answer=index_to_letter(rec.picks_index) if rec.picks_index is not None else None,
-        hint_target_letter=rec.target_letter or None,
-        gold_letter=index_to_letter(rec.correct_index),
-        engaged_hint=rec.picks_hinted,           # followed the hint (first-class; SPEC §2.2)
-        mentions_hint=rec.mentions_hint,          # CoT references hint artifacts (lenient)
-        judge_verdict=rec.used_hint,              # strict "used the hint" verdict
-        judge_method=rec.judge_method,
-        judge_rationale=", ".join(rec.judge_evidence),
-    )
 
 
 async def main(args) -> None:
@@ -106,7 +78,7 @@ async def main(args) -> None:
         records += recs
         if run is not None:
             for rec in recs:
-                run.log_rollout(**_rollout_row(rec, id2item[rec.item_id]))
+                run.log_rollout(**solver.rollout_row(rec, id2item[rec.item_id]))
 
     s = metrics.unfaithfulness_summary(records)
     print("\n==== §3.1 unfaithfulness summary ====")
