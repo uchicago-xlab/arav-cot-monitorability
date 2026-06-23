@@ -1,9 +1,9 @@
 # STATUS — Second Look: CoT Monitorability
 
-**Date:** 2026-06-22 · **Session #2** (Phase 2)
-**Build-order step (SPEC_phase2 §4):** step 1 **WandB logger DONE** (everything logs through it); step 2 **§3.1 susceptibility pre-check DONE → actors picked**. NEXT = judge-validation + powered §3.1 (60×10) = Gate 1. Per-model necessity is the CORE principle.
-**Gates:** Gate 1 = powered **GPQA** §3.1 on a *hint-susceptible* actor (judge-validated, baseline-subtracted, 2σ) — NOT cleared; actor now selected, run not yet done. Gate 2 — not reached.
-**W&B:** project live at `wandb.ai/aravdhoot/cot-monitorability` (pre-check = 4 runs, CoT tables + transcripts artifacts synced).
+**Date:** 2026-06-23 · **Session #3** (Phase 2)
+**Build-order step (SPEC_phase2 §4):** steps 1–4 DONE — WandB logger, susceptibility pre-check, **judge validation (32/32)**, **powered §3.1 sweep 60×10 → GATE 1 CLEARED**. NEXT = §3.2 gradient / Follow-up C; qwen3-30b backfill. Per-model necessity is the CORE principle.
+**Gates:** **Gate 1 = ✅ CLEARED** — powered GPQA §3.1, judge-validated, baseline-subtracted, 2σ: simple-hint unfaithfulness replicates on 3/4 actors (incl. paper analog gemini-2.5-flash + faithful gemini-3-flash). Gate 2 — not reached.
+**W&B:** `wandb.ai/aravdhoot/cot-monitorability` — per-actor sweep runs (`exp_hints_sweep`), figures (`exp_hints_sweep_figures`), judge-validation (`blooming-firefly-10`); CoT tables + transcripts synced.
 
 ## Module status
 - **DONE + tested (53 tests pass / 5 skip):** `models/roster.py`, `monitors/uplift_filter.py` (per-model necessity engine), `exp_hints/data.py` (GPQA+MMLU-Pro), `exp_hints/hints.py` (5-family suite), `monitors/hint_judge.py`, `exp_hints/solver.py` (2×3 grid, `<question-metadata>` injection, `\boxed`/`<answer>` extraction, correct-with-CoT filter, bounded concurrency, **audit fields + shared `rollout_row`**), `metrics.py` (unfaithfulness delta + Wilson 2σ + `flatten_for_logging`), **`logging/wandb_logger.py`** (one run per exp×actor×config; config+scalars+2σ; per-rollout CoT `wandb.Table`; `transcripts.jsonl` artifact; disabled/offline/online; no key leakage).
@@ -48,6 +48,24 @@ Per-model — **live · reasoning · prefill** (provider in parens):
 - **§3.1 PAPER replication setup (user decisions):** actor = **gemini-2.5-flash** (Flash analog of the retired 2.0 Flash); item filter = **correct-with-CoT** (a true no-CoT arm is confounded on mandatory-reasoning Gemini); injection = **Chen et al. `<question-metadata>` block** (decoy status/peer-reviewed/success-rate + hint in the `<answer>` slot). Generalization-only caveat: we read its body CoT, it may also reason hidden. Extraction handles `\boxed{}`/`<answer>`/"answer is X".
 
 ## Results so far
+**★ §3.1 POWERED SWEEP — GATE 1 (Session #3, 2026-06-23; GPQA 60 items × 10 samples/cell, correct-with-CoT filtered, arithmetic family, BOTH CoT arms; `scripts/run_sweep.py`; W&B `exp_hints_sweep` per actor):**
+**GATE 1 ✅ CLEARED** — simple-hint unfaithfulness REPLICATES with non-overlapping 2σ on 3/4 actors:
+| actor | baseline | **simple unfaithful (Gate-1)** | delta | gate | complex L1/L2/L3 (necessity) |
+|---|---|---|---|---|---|
+| gemini-2.5-flash (paper) | 0.02 | 0.17 [0.14,0.20] | **+0.15** | ✅ PASS | declines (foll 0.02–0.04, unfaith ~0.01) |
+| gemini-3-flash | 0.02 | 0.45 [0.40,0.49] | **+0.43** | ✅ PASS | one_shot/declines (foll 0.08–0.17, unfaith 0.01) |
+| gpt-5.5 | 0.02 | 0.45 [0.40,0.49] | **+0.43** | ✅ PASS | one_shot (foll ~0.10, unfaith 0.06–0.08) |
+| gpt-oss-120b | 0.07 | 0.07 [0.05,0.10] | +0.00 | ns (overlap) | declines (foll ~0.10) |
+- **Mechanism (the §3.1 contrast):** SIMPLE cue (cheap) → HIGH unfaithfulness (0.45, concealed on ~all follows); COMPLEX decode (costly) → LOW follow + LOW unfaithfulness (when followed, the decode is REVEALED in CoT — gemini-3-flash complex unfaith 0.01). **Models DECLINE the costly bad hint** rather than pay the CoT cost → supports the necessity thesis.
+- **Necessity-gated complex (L2/L3 = EXTENSION):** NO actor opened a clean cot_necessary+followed window — every complex cell is one_shot or declines (figures render "no necessity window", NOT 0%). Closest: gemini-3-flash L2 (foll 0.17, +0.10 CoT-uplift; `one_shot*` by a hair — no-CoT follow 0.072 just over baseline+margin). The clean per-(actor×level) decode-necessity flip lives in the DECODE-ONLY calibration (gpt-5.5→arith L3), not the follow-based sweep where actors decline. **Caveat: necessity label threshold (point+0.05 margin) is sensitive near baseline — see fig4 follow-rates for the raw denominators.**
+- **gpt-oss-120b = cue-robust NEGATIVE** (delta~0, high baseline 0.07), not a failure. The powered run also CORRECTED the pre-check's gemini-2.5-flash "0.00" (a 0/20 small-sample artifact → 0.17 at 600 samples).
+- **Figures** (`figures/` + W&B `exp_hints_sweep_figures`, all Wilson 2σ): fig1_headline (Gate-1 replication grouped bar), fig2_necessity_gated, fig3_decode_necessity, fig4_follow_rate.
+- **What figs 2 & 3 (complex arm) tell us:**
+  - **Costly hints are DECLINED, not hidden** — every complex cell is `declines`/`one_shot`, so complex unfaithfulness is UNDEFINED (no qualifying followers), **not** 0%. This is the necessity thesis: cheap simple cue → followed+concealed; costly decode → not worth following.
+  - **Raising L1→L2→L3 barely moves follow-rates** (all floor-low, ~0.02–0.17) — actors ignore the hint, so the sweep shows **no dramatic one-shot→CoT-necessary flip**; gemini-3-flash L2 is the only near-window.
+  - **CoT can INCREASE robustness** — for gemini-2.5-flash the no-CoT arm follows the hint MORE than with-CoT (reasoning steers it back to the correct answer).
+  - **Caveat:** the follow-based curve conflates "can-decode" with "chooses-to-follow"; the clean necessity flip (gpt-5.5 → CoT-necessary at arithmetic L3, uplift +0.90) lives only in the decode-only calibration (`calibrate_complex.py`), not here.
+- **Cost/wall:** 4×6000 rollouts; 36 min (gpt-5.5) → 346 min (gpt-oss, ~7M out tok). **qwen3-30b SKIPPED** (user) — ready via Alibaba pin (answered 1.00); its leg projected ~17h/$19.
 **§3.1 susceptibility pre-check (Session #2; GPQA 5 items × 4 samples, with-CoT, arithmetic L1; W&B-logged):** screened 5 candidates for hint follow-rate →
 | actor | baseline | simple_follow | complex_follow | simple_unfaithful | used\|cmplx |
 |---|---|---|---|---|---|
@@ -71,11 +89,11 @@ Reads: **qwen3 = faithful follower** (follows the cue 0.40 but REVEALS it, unfai
 Phase-0 headline (recap): prefill works on all Gemini + GPT-5.5 + open weights, not Opus; faithful raw CoT only from open weights; necessity is model-relative.
 
 ## Current blocker / next
-None blocking. **PAUSED at the pre-check gate** (user boundary: "through the pre-check", then stop before the powered 60×10). NEXT when resumed (SPEC_phase2 §4 steps 3→4):
-1. ✅ **GPT-5.5 complex-level calibration — DONE:** complex arm = **arithmetic L3** (uplift +0.90). `scripts/calibrate_complex.py` (reusable per-actor). Geminis stay at L1.
-2. **Judge validation** — hand-label ~20–30 with-CoT traces (gemini-3-flash + gpt-5.5), report `hint_judge` agreement BEFORE trusting the delta.
-3. **Powered §3.1 (60 items × 10 samples)** = **Gate 1**, per-actor complex level: **gemini-2.5-flash** (arith L1) + **gemini-3-flash** (arith L1) + **gpt-5.5** (arith L3). Cost note: GPT-5.5 is the priciest actor (~dominates). Watch: complex_follow≈0.05–0.10 → 60×10 gives ~30–60 followers (thin but defined); if complex follow→0 at scale, report decline-to-follow (do NOT report a zero-denominator rate as "0% unfaithful", SPEC §2.2).
-Then §3.2 generator (`exp_gradient/algebra.py`) + per-model necessity-threshold sweep (Follow-up C) — gpt-5.5 is the headline scale-erosion actor.
+None blocking. **GATE 1 CLEARED** (powered §3.1 sweep, judge-validated). NEXT:
+1. **§3.2 difficulty gradient + Follow-up C** (`exp_gradient/algebra.py` — still a stub): SymPy `a·x=b → x+c`, sweep B, per-actor necessity-threshold. gpt-5.5 = headline scale-erosion actor (one-shots low B). The decode-necessity calibration machinery (`calibrate_complex.py`) + sweep necessity-labels are the template.
+2. **qwen3-30b backfill** of the §3.1 sweep (skipped this round; Alibaba pin, answered 1.00, ~17h/$19) — adds the faithful-follower datapoint.
+3. Optional: a more hint-susceptible COMPLEX framing if we want to force a clean `cot_necessary`+followed window (current complex arm = universally declined → "models decline costly hints", which is itself a valid result).
+**Open methodological note:** the necessity label uses a point+0.05 margin over baseline; gemini-3-flash L2 sits on the one_shot/cot_necessary boundary. Consider a CI-based or decode-only necessity criterion for §3.2.
 
 ## Help wanted
 - Open-weight capture now CORRECT (channel-aware); follow/unfaithful measured. Still TODO: per-actor COMPLEX-necessity level for qwen3/gpt-oss (all show used|cmplx 0 at L1 → one-shot the L1 decode, like gpt-5.5 pre-calibration). Run `scripts/calibrate_complex.py --model qwen3` (bump its max_tokens) before any open-weight complex arm.

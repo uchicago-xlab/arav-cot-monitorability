@@ -120,6 +120,8 @@ class GridRecord:
     judge_evidence: tuple[str, ...] = ()
     judge_method: str | None = None
     cot_source: str = "body"   # which field was judged: "body" | "reasoning" (channel-aware capture)
+    in_tok: int = 0            # token usage (for cost accounting)
+    out_tok: int = 0
 
     @property
     def picks_hinted(self) -> bool:
@@ -155,12 +157,15 @@ async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_sourc
     if letter is None and reasoning:        # thinking models may state the answer only in the trace
         letter = extract_answer_letter(reasoning)
     cot = reasoning if cot_source == "reasoning" else extract_cot(body)
+    usage = getattr(out, "usage", None)
     return {"letter": letter,
             "picks_index": letter_to_index(letter) if letter else None,
             "cot": cot,                # the JUDGED trace (reasoning for native_raw, else body-pre-answer)
             "reasoning": reasoning,
             "prompt": prompt,          # full prompt + body -> CoT-audit table / transcripts
-            "full": body}
+            "full": body,
+            "in_tok": getattr(usage, "input_tokens", 0) or 0,
+            "out_tok": getattr(usage, "output_tokens", 0) or 0}
 
 
 async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arithmetic",
@@ -195,6 +200,45 @@ async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arith
                 sample_idx=si, seed=eff_seed, prompt=r["prompt"], full_completion=r["full"],
                 target_letter=(hint.target_letter if hint is not None else ""),
                 judge_evidence=evidence, judge_method=method, cot_source=cot_source))
+    return records
+
+
+async def run_sweep(model, item: MCQItem, *, n_samples: int, levels: tuple[int, ...] = (1, 2, 3),
+                    family: str = "arithmetic", seed: int | None = None, cot_source: str = "body",
+                    cot_modes: tuple[bool, ...] = (True, False), concurrency: int = 8) -> list[GridRecord]:
+    """Powered §3.1 sweep (SPEC_phase2 §2/Step 3): conditions none / simple / complex@each level,
+    each in BOTH with-CoT (judged) AND no-CoT (necessity) arms. All hints share ONE randomised wrong
+    target so the no-hint cell is a clean baseline. hint_kind ∈ {none, simple, complex_L1, …}."""
+    eff_seed = seed if seed is not None else _seed_from(item.id)
+    rng = random.Random(eff_seed)
+    target = rng.choice([i for i in range(item.n_options) if i != item.correct_index])
+    conds: list[tuple[str, object]] = [
+        ("none", None),
+        ("simple", make_simple_hint(item.correct_index, item.n_options, rng=rng, target=target)),
+    ]
+    for lv in levels:
+        conds.append((f"complex_L{lv}", make_complex_hint(item.correct_index, item.n_options, rng=rng,
+                                                          family=family, level=lv, target=target)))
+    flat = [(kind, hint, wc) for (kind, hint) in conds for wc in cot_modes]
+    results = await _bounded_gather(
+        [run_condition(model, item, hint, with_cot=wc, cot_source=cot_source)
+         for (_, hint, wc) in flat for _ in range(n_samples)], concurrency)
+    records: list[GridRecord] = []
+    for ci, (kind, hint, wc) in enumerate(flat):
+        for si in range(n_samples):
+            r = results[ci * n_samples + si]
+            used = method = None
+            evidence: tuple[str, ...] = ()
+            if wc and hint is not None:
+                hu = (judge_simple(r["cot"], hint.target_letter) if kind == "simple"
+                      else judge_complex(r["cot"], hint.decode))
+                used, evidence, method = hu.used, hu.evidence, hu.method
+            records.append(GridRecord(
+                item.id, kind, wc, target, item.correct_index, r["picks_index"], r["cot"], used,
+                sample_idx=si, seed=eff_seed, prompt=r["prompt"], full_completion=r["full"],
+                target_letter=(hint.target_letter if hint is not None else ""),
+                judge_evidence=evidence, judge_method=method, cot_source=cot_source,
+                in_tok=r.get("in_tok", 0), out_tok=r.get("out_tok", 0)))
     return records
 
 
