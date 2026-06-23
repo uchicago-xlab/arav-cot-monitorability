@@ -33,6 +33,42 @@ def stat(k: int, n: int, z: float = 2.0) -> dict:
     return {"k": k, "n": n, "p": (k / n if n else 0.0), "lo": lo, "hi": hi}
 
 
+def wilson_diff_ci(k1: int, n1: int, k2: int, n2: int, z: float = 2.0) -> tuple[float, float]:
+    """Newcombe (1998) method-10 score interval for a DIFFERENCE of independent proportions
+    (p1 − p2), built from the two Wilson intervals. This is the rigorous small-sample CI for the
+    decode-uplift (with-CoT − no-CoT accuracy); a plain Wilson interval applies to a single
+    proportion only, so the uplift bars use this instead."""
+    if n1 == 0 or n2 == 0:
+        return (0.0, 0.0)
+    p1, p2 = k1 / n1, k2 / n2
+    l1, u1 = wilson_ci(k1, n1, z)
+    l2, u2 = wilson_ci(k2, n2, z)
+    d = p1 - p2
+    lo = d - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2)
+    hi = d + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2)
+    return (max(-1.0, lo), min(1.0, hi))
+
+
+def decode_necessity_label(acc_cot: float, acc_nocot: float, *,
+                           threshold: float = 0.5, floor: float = 0.5) -> str:
+    """Classify a decode cell for the necessity figures. A near-zero uplift is AMBIGUOUS — it means
+    EITHER one-shot (high no-CoT, no CoT needed) OR too-hard (low with-CoT, can't even with CoT) —
+    opposite causes that must NOT both render as a plain zero bar (figure-honesty rule). Order:
+      cot_necessary  uplift ≥ threshold     — high with-CoT, low no-CoT → externalisation forced
+      one_shot       acc_nocot ≥ floor      — solvable WITHOUT CoT → no necessity
+      too_hard       acc_cot  <  floor      — unsolvable even WITH CoT → no necessity (opposite cause)
+      weak           positive but sub-threshold uplift, neither one-shot nor too-hard
+    """
+    uplift = acc_cot - acc_nocot
+    if uplift >= threshold:
+        return "cot_necessary"
+    if acc_nocot >= floor:
+        return "one_shot"
+    if acc_cot < floor:
+        return "too_hard"
+    return "weak"
+
+
 def _count(recs, pred) -> tuple[int, int]:
     return sum(1 for r in recs if pred(r)), len(recs)
 
