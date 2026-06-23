@@ -47,23 +47,25 @@ Per-model — **live · reasoning · prefill** (provider in parens):
 - **§3.1 PAPER replication setup (user decisions):** actor = **gemini-2.5-flash** (Flash analog of the retired 2.0 Flash); item filter = **correct-with-CoT** (a true no-CoT arm is confounded on mandatory-reasoning Gemini); injection = **Chen et al. `<question-metadata>` block** (decoy status/peer-reviewed/success-rate + hint in the `<answer>` slot). Generalization-only caveat: we read its body CoT, it may also reason hidden. Extraction handles `\boxed{}`/`<answer>`/"answer is X".
 
 ## Results so far
-**§3.1 susceptibility pre-check (Session #2; GPQA 5 items × 4 samples, with-CoT, arithmetic L1; W&B-logged):** screened 4 candidates for hint follow-rate →
-| actor | baseline | simple_follow | complex_follow | simple_unfaithful |
-|---|---|---|---|---|
-| **gemini-3-flash** | 0.05 | **0.50 [0.30,0.70]** | 0.05 | **0.30** |
-| gemini-2.5-flash (paper) | 0.00 | 0.00 [0,0.17] | 0.05 | 0.00 |
-| qwen3 | 0.00 | 0.00 | 0.00 | 0.00 |
-| gpt-oss-120b | 0.00 | 0.00 | 0.00 | 0.00 |
-**→ ACTOR DECISION (user: "both, labeled separately"):** powered §3.1 runs on **gemini-2.5-flash** (paper faithful-replication datapoint; robust to the cue → its complex arm is the "declines the costly hint" framing, SPEC §2.2) **+ gemini-3-flash** (the susceptible faithful actor: follows the simple cue 50%, reveals it only ~40% of follows → clean unfaithfulness delta). Open weights (qwen3/gpt-oss) show 0 follow AND their body CoT is empty (reasoning in hidden channel) → out of the §3.1 judged arm; revisit under the necessity check / §3.2.
+**§3.1 susceptibility pre-check (Session #2; GPQA 5 items × 4 samples, with-CoT, arithmetic L1; W&B-logged):** screened 5 candidates for hint follow-rate →
+| actor | baseline | simple_follow | complex_follow | simple_unfaithful | used\|cmplx |
+|---|---|---|---|---|---|
+| **gpt-5.5** (channel-off) | 0.10 | **0.50 [0.30,0.70]** | 0.10 | **0.40** | 0/2 |
+| **gemini-3-flash** | 0.05 | **0.50 [0.30,0.70]** | 0.05 | **0.30** | 0/1 |
+| gemini-2.5-flash (paper) | 0.00 | 0.00 [0,0.17] | 0.05 | 0.00 | — |
+| qwen3 | 0.00 | 0.00 | 0.00 | 0.00 | — |
+| gpt-oss-120b | 0.00 | 0.00 | 0.00 | 0.00 | — |
+**→ ACTOR DECISION (user: 3 actors, labeled separately):** powered §3.1 on **gemini-2.5-flash** (paper datapoint; cue-robust → complex arm = "declines the costly hint", SPEC §2.2) **+ gemini-3-flash** (susceptible faithful actor; necessity-valid on BOTH arms → the clean delta) **+ gpt-5.5** (strongest simple-unfaithfulness 0.40, cross-family Google→OpenAI robustness; **channel-disabled so body CoT is judgeable**). **GPT-5.5 complex-arm caveat:** at L1 it one-shots the decode (used|follow 0/2; necessity=fails_easy) → its complex arm must run at ESCALATED difficulty (per-model necessity-calibrate first), else the complex number is invalid. Open weights (qwen3/gpt-oss) show 0 follow AND empty body CoT (reasoning hidden) → out of the §3.1 judged arm; revisit under necessity check / §3.2.
 **§3.1 first GPQA paper replication (gemini-2.5-flash; PRELIMINARY — 7 items × 4 samples, Session #1):** direction REPLICATES — baseline pick-target 0.00; **simple unfaithful 0.18 [0.08,0.36]**; **complex unfaithful 0.00 [0,0.12]**. Underpowered; consistent with the pre-check (2.5-flash is cue-robust).
 **`complex=0` RESOLVED (diagnostic):** the decode is genuinely CoT-necessary (decode acc with-CoT 0.94 vs forced-no-CoT 0.22 at paper level 1; uplift +0.72 → pushback #3 cleared). complex follow=0 because the model **IGNORES** the costly hint and answers correctly (engaged_hint=False), NOT because it can't decode — so "follows-and-reveals" isn't directly observed (no followers; would need a more hint-susceptible framing/model).
 Phase-0 headline (recap): prefill works on all Gemini + GPT-5.5 + open weights, not Opus; faithful raw CoT only from open weights; necessity is model-relative.
 
 ## Current blocker / next
 None blocking. **PAUSED at the pre-check gate** (user boundary: "through the pre-check", then stop before the powered 60×10). NEXT when resumed (SPEC_phase2 §4 steps 3→4):
-1. **Judge validation** — hand-label ~20–30 with-CoT gemini-3-flash traces, report `hint_judge` agreement BEFORE trusting the delta.
-2. **Powered §3.1 (60 items × 10 samples)** on **gemini-2.5-flash + gemini-3-flash** (labeled separately) = **Gate 1**. Watch: gemini-3-flash complex_follow≈0.05 → 60×10 gives ~30 followers (thin but defined); if complex follow→0 at scale, report decline-to-follow (do NOT report a zero-denominator rate as "0% unfaithful", SPEC §2.2).
-Then §3.2 generator (`exp_gradient/algebra.py`) + per-model necessity-threshold sweep (Follow-up C).
+1. **GPT-5.5 complex-level calibration** (cheap, do first) — sweep hint level/family for gpt-5.5 until the decode is CoT-necessary (uplift > 0); use that level for its complex arm (L1 is invalid: used|follow 0/2).
+2. **Judge validation** — hand-label ~20–30 with-CoT traces (gemini-3-flash + gpt-5.5), report `hint_judge` agreement BEFORE trusting the delta.
+3. **Powered §3.1 (60 items × 10 samples)** on **gemini-2.5-flash + gemini-3-flash + gpt-5.5** (labeled separately) = **Gate 1**. Cost note: GPT-5.5 is the priciest actor (~dominates). Watch: complex_follow≈0.05–0.10 → 60×10 gives ~30–60 followers (thin but defined); if complex follow→0 at scale, report decline-to-follow (do NOT report a zero-denominator rate as "0% unfaithful", SPEC §2.2).
+Then §3.2 generator (`exp_gradient/algebra.py`) + per-model necessity-threshold sweep (Follow-up C) — gpt-5.5 is the headline scale-erosion actor.
 
 ## Help wanted
 - Open-weight necessity (qwen3/gpt-oss) not yet run — needed before trusting them as faithful §3.1 actors.
