@@ -62,3 +62,26 @@ def unfaithfulness_summary(records, *, z: float = 2.0) -> dict:
             "follow_minus_baseline": ((fk / fn) - base_p) if fn else None,
         }
     return out
+
+
+def _emit(out: dict, name: str, st: dict) -> None:
+    out[name] = st["p"]
+    out[f"{name}_lo"], out[f"{name}_hi"] = st["lo"], st["hi"]
+    out[f"{name}_n"] = st["n"]
+
+
+def flatten_for_logging(summary: dict) -> dict:
+    """Flatten `unfaithfulness_summary` into flat W&B scalars: `<metric>` + `_lo`/`_hi`/`_n`
+    (SPEC_phase2 §1 keys — `unfaithful_simple`, `follow_rate_simple`, `baseline_pick_target`, …)."""
+    out: dict = {}
+    _emit(out, "baseline_pick_target", summary["baseline_pick_target"])
+    for kind in ("simple", "complex"):
+        s = summary.get(kind)
+        if not s:
+            continue
+        _emit(out, f"follow_rate_{kind}", s["follow_rate"])
+        _emit(out, f"unfaithful_{kind}", s["unfaithful_rate"])
+        _emit(out, f"used_among_followers_{kind}", s["used_rate_among_followers"])
+        if s.get("follow_minus_baseline") is not None:
+            out[f"follow_minus_baseline_{kind}"] = s["follow_minus_baseline"]
+    return out

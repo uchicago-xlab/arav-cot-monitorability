@@ -100,6 +100,14 @@ class GridRecord:
     picks_index: int | None
     cot: str
     used_hint: bool | None    # judge verdict (with-CoT + hinted only); else None
+    # ── audit fields (drive the W&B CoT table / transcripts.jsonl; default empty) ──
+    sample_idx: int = 0
+    seed: int | None = None
+    prompt: str = ""
+    full_completion: str = ""
+    target_letter: str = ""
+    judge_evidence: tuple[str, ...] = ()
+    judge_method: str | None = None
 
     @property
     def picks_hinted(self) -> bool:
@@ -108,6 +116,12 @@ class GridRecord:
     @property
     def picks_correct(self) -> bool:
         return self.picks_index == self.correct_index
+
+    @property
+    def mentions_hint(self) -> bool:
+        """Lenient: any judge signal fired (the CoT references hint artifacts), even if the strict
+        `used_hint` verdict is False — distinct from `used_hint`/judge_verdict."""
+        return bool(self.judge_evidence)
 
 
 # ── live runners ──
@@ -121,13 +135,16 @@ async def run_condition(model, item: MCQItem, hint, *, with_cot: bool) -> dict:
     letter = extract_answer_letter(full)
     return {"letter": letter,
             "picks_index": letter_to_index(letter) if letter else None,
-            "cot": extract_cot(full)}
+            "cot": extract_cot(full),
+            "prompt": prompt,          # full prompt + raw completion -> CoT-audit table / transcripts
+            "full": full}
 
 
 async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arithmetic",
                    level: int = 1, seed: int | None = None,
                    cot_modes: tuple[bool, ...] = (True, False), concurrency: int = 8) -> list[GridRecord]:
-    rng = random.Random(seed if seed is not None else _seed_from(item.id))
+    eff_seed = seed if seed is not None else _seed_from(item.id)
+    rng = random.Random(eff_seed)
     target = rng.choice([i for i in range(item.n_options) if i != item.correct_index])
     hints = {
         "none": None,
@@ -143,12 +160,17 @@ async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arith
     for ci, (kind, hint, wc) in enumerate(conds):
         for si in range(n_samples):
             r = results[ci * n_samples + si]
-            used = None
+            used = method = None
+            evidence: tuple[str, ...] = ()
             if wc and hint is not None:
-                used = (judge_simple(r["cot"], hint.target_letter).used if kind == "simple"
-                        else judge_complex(r["cot"], hint.decode).used)
-            records.append(GridRecord(item.id, kind, wc, target, item.correct_index,
-                                      r["picks_index"], r["cot"], used))
+                hu = (judge_simple(r["cot"], hint.target_letter) if kind == "simple"
+                      else judge_complex(r["cot"], hint.decode))
+                used, evidence, method = hu.used, hu.evidence, hu.method
+            records.append(GridRecord(
+                item.id, kind, wc, target, item.correct_index, r["picks_index"], r["cot"], used,
+                sample_idx=si, seed=eff_seed, prompt=r["prompt"], full_completion=r["full"],
+                target_letter=(hint.target_letter if hint is not None else ""),
+                judge_evidence=evidence, judge_method=method))
     return records
 
 

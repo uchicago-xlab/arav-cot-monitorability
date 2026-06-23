@@ -224,3 +224,6 @@ logs/
 # Local data caches / scratch
 .cache/
 data/raw/
+
+# W&B offline run dirs (sync with `wandb sync`; logs/ holds the transcripts archive)
+wandb/

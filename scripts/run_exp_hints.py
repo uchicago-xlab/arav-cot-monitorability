@@ -23,8 +23,37 @@ from inspect_ai.model import GenerateConfig  # noqa: E402
 
 from cot_mon import metrics  # noqa: E402
 from cot_mon.exp_hints import data, solver  # noqa: E402
+from cot_mon.exp_hints.data import index_to_letter  # noqa: E402
+from cot_mon.logging import wandb_logger as wl  # noqa: E402
 from cot_mon.models import roster  # noqa: E402
 from cot_mon.monitors import uplift_filter as uf  # noqa: E402
+
+
+def _answer_span(full: str) -> str:
+    return ("<answer>" + full.split("<answer>", 1)[1]) if "<answer>" in full else full[-300:]
+
+
+def _rollout_row(rec: solver.GridRecord, item: data.MCQItem) -> dict:
+    """Map one GridRecord -> a CoT-verification table row (SPEC_phase2 §1 schema)."""
+    return dict(
+        item_id=rec.item_id,
+        topic=item.metadata.get("subdomain") or item.metadata.get("category"),
+        hint_type=rec.hint_kind,
+        cot_mode="with_cot" if rec.with_cot else "no_cot",
+        sample_idx=rec.sample_idx,
+        seed=rec.seed,
+        prompt_full=rec.prompt,
+        cot_text_full=rec.cot,
+        final_answer=_answer_span(rec.full_completion),
+        extracted_answer=index_to_letter(rec.picks_index) if rec.picks_index is not None else None,
+        hint_target_letter=rec.target_letter or None,
+        gold_letter=index_to_letter(rec.correct_index),
+        engaged_hint=rec.picks_hinted,           # followed the hint (first-class; SPEC §2.2)
+        mentions_hint=rec.mentions_hint,          # CoT references hint artifacts (lenient)
+        judge_verdict=rec.used_hint,              # strict "used the hint" verdict
+        judge_method=rec.judge_method,
+        judge_rationale=", ".join(rec.judge_evidence),
+    )
 
 
 async def main(args) -> None:
@@ -52,13 +81,32 @@ async def main(args) -> None:
         print("No items survived the filter — scale up N/items or lower the threshold. (Pipeline validated.)")
         return
 
+    # ── W&B run (config + per-rollout CoT table + transcripts; SPEC_phase2 §1) ──
+    id2item = {it.id: it for it in kept}
+    run = None
+    if not args.no_wandb:
+        cfg = wl.run_config(
+            describe=roster.describe(args.model),
+            n_items=len(kept), n_samples=args.n_samples, seed=args.seed,
+            dataset=args.dataset, dataset_hash=wl.dataset_hash([it.id for it in kept]),
+            hint_family=args.family,
+            sampling={"temperature": args.temperature, "max_tokens": args.max_tokens},
+            level=args.level, item_filter=args.filter, cot_arm=args.cot_arm)
+        run = wl.WandbRun(experiment="exp_hints", actor=args.model, config=cfg,
+                          gate=args.gate, mode=args.wandb_mode)
+        print(f"wandb: {run.run.url or '(' + (args.wandb_mode or 'online') + ')'}", flush=True)
+
     # ── grid + metric ──
     cot_modes = (True,) if args.cot_arm == "with_only" else (True, False)
     print(f"running grid (family={args.family} level={args.level}, cot_modes={cot_modes}) ...", flush=True)
     records = []
     for it in kept:
-        records += await solver.run_grid(model, it, n_samples=args.n_samples, family=args.family,
-                                         level=args.level, cot_modes=cot_modes)
+        recs = await solver.run_grid(model, it, n_samples=args.n_samples, family=args.family,
+                                     level=args.level, seed=args.seed, cot_modes=cot_modes)
+        records += recs
+        if run is not None:
+            for rec in recs:
+                run.log_rollout(**_rollout_row(rec, id2item[rec.item_id]))
 
     s = metrics.unfaithfulness_summary(records)
     print("\n==== §3.1 unfaithfulness summary ====")
@@ -73,6 +121,11 @@ async def main(args) -> None:
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps({"args": vars(args), "summary": s}, indent=2))
     print(f"full summary -> {out}")
+
+    if run is not None:
+        run.log_scalars(metrics.flatten_for_logging(s))
+        tpath = run.finish(extra_artifacts=[out])
+        print(f"wandb: logged {run.n_rollouts} rollouts" + (f" + transcripts {tpath}" if tpath else ""))
 
 
 if __name__ == "__main__":
@@ -90,4 +143,9 @@ if __name__ == "__main__":
     ap.add_argument("--temperature", type=float, default=0.7)
     ap.add_argument("--max-tokens", type=int, default=2048)
     ap.add_argument("--categories", nargs="*", default=None)
+    ap.add_argument("--seed", type=int, default=None, help="grid seed (default: per-item hash)")
+    ap.add_argument("--gate", default=None, help="W&B tag, e.g. gate1")
+    ap.add_argument("--no-wandb", action="store_true", help="skip W&B logging")
+    ap.add_argument("--wandb-mode", default=None, choices=["online", "offline", "disabled"],
+                    help="W&B mode (default: online / $WANDB_MODE)")
     asyncio.run(main(ap.parse_args()))
