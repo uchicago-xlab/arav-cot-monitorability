@@ -108,7 +108,7 @@ def draw_uplift_bars(ax, cells: list[Cell], *, group_attr: str, series: list[str
     ax.set_xticks(range(len(groups)))
     ax.set_xticklabels([group_label.get(g, g) for g in groups], fontsize=8.5)
     ax.set_ylabel(f"decode-uplift = with-CoT − no-CoT\n({metric_label})")
-    ax.set_ylim(min(-0.6, ax.get_ylim()[0]), 1.08)
+    ax.set_ylim(min(-0.6, ax.get_ylim()[0]), 1.22)   # headroom for the rotated (wCoT,noCoT) annotations
     ax.set_title(title, fontsize=9.5)
     if legend:
         ax.legend(handles=verdict_legend_handles(cells), fontsize=6.8, loc="lower right", framealpha=0.92)

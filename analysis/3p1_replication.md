@@ -140,8 +140,11 @@ floored-low rates either way, and "one_shot vs declines" here is a near-baseline
 artifact, **not** a robust capability claim. The **clean per-(actor × level) decode-necessity flip is
 measured separately** in the decode-only extension (`scripts/decode_necessity_sweep.py` →
 `figures/3p1_complex_hints/`), which tests *can the model compute the letter at all* with vs without
-CoT — independent of whether it chooses to follow. There, gpt-5.5 is genuinely CoT-necessary at
-arithmetic L3 (decode uplift +0.90: with-CoT 1.00, no-CoT 0.10).
+CoT — independent of whether it chooses to follow (full results: [`3p1_complex_hints.md`](3p1_complex_hints.md)).
+There, the decode is genuinely CoT-necessary for most families (e.g. gpt-5.5 arithmetic L3 uplift +0.78
+at n=240, with-CoT 1.00 / no-CoT 0.22) — confirming the low §3.1 complex follow is a *choice not to pay
+the CoT cost*, not an inability — while the per-model erosion shows up cleanly (gpt-5.5 **one-shots
+`bignum` L2/L3** that gemini-3-flash needs CoT for).
 
 ---
 
