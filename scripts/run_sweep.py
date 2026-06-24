@@ -14,6 +14,7 @@ extension. Everything logs to W&B (per-rollout CoT table + transcripts.jsonl + W
 import argparse
 import asyncio
 import json
+import logging
 import os
 import time
 import urllib.request
@@ -22,6 +23,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+# Channel-disabled Gemini actors emit an empty `reasoning.text` detail that inspect_ai's strict
+# pydantic model rejects; it's a caught warning (the body `.completion` we judge is unaffected), but
+# it dumps the full details JSON per call and floods the run log. Silence ONLY that logger.
+logging.getLogger("inspect_ai.model._openrouter_reasoning").setLevel(logging.ERROR)
 
 from inspect_ai.model import GenerateConfig  # noqa: E402
 
