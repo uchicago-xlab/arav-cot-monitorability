@@ -66,8 +66,8 @@ actors:
     tier: faithful_hints_gradient
     necessity: todo
     uplift_set: null
-    experiments: [hints, gradient, oversight, followup_a]
-    notes: "Open-weight faithful raw CoT; fallback substrate if qwen3 unavailable."
+    experiments: [hints, oversight, followup_a]     # NOT gradient: §3.2 prefill-forcing INVALID (see notes)
+    notes: "Open-weight faithful raw CoT; fallback substrate if qwen3 unavailable. §3.2 (gradient) REMOVED — prefill-adoption diagnostic (2026-06-24, scripts/phase0_gptoss_adoption.py): gpt-oss RE-DERIVES a forced wrong intermediate 15/15 (sees it, then 'let's correct' → re-derives) ⇒ §3.2 forcing yields artifacts. Re-add only with a forcing the model OWNS."
   gpt_5_5:                                          # CONDITIONAL — faithful ONLY channel-disabled
     id: openrouter/openai/gpt-5.5                   # unlisted in /models but routable; fallback openai/gpt-5
     provider: openai
