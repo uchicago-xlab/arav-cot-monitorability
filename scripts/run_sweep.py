@@ -54,7 +54,12 @@ async def run_actor(name, args):
     max_tokens = max(args.max_tokens, 8000) if cot_source == "reasoning" else args.max_tokens
     model = roster.build_model(name, config=GenerateConfig(temperature=args.temperature, max_tokens=max_tokens))
     levels = tuple(args.levels)
-    print(f"\n=== {name}  (cot_source={cot_source}, max_tokens={max_tokens}) ===", flush=True)
+    # --no-filter bypasses the correct-with-CoT item gate; tag its outputs so they never overwrite
+    # the filtered logs/transcripts (the unfiltered run answers "does §3.1 survive without the gate").
+    tag = "_unfiltered" if args.no_filter else ""
+    experiment = "exp_hints_sweep" + tag
+    print(f"\n=== {name}  (cot_source={cot_source}, max_tokens={max_tokens}, item_filter="
+          f"{'none' if args.no_filter else 'correct_with_cot'}) ===", flush=True)
 
     items = data.load_gpqa(n=args.candidates)
     t0 = time.monotonic()
@@ -83,7 +88,8 @@ async def run_actor(name, args):
     n_gen = len(records) + (len(items) * args.filter_samples if not args.no_filter else 0)
     meta = {"cot_source": cot_source, "max_tokens": max_tokens, "n_kept": len(kept),
             "n_rollouts": len(records), "n_gen_incl_filter": n_gen, "wall_s": wall,
-            "in_tok": in_tok, "out_tok": out_tok}
+            "in_tok": in_tok, "out_tok": out_tok,
+            "item_filter": "none" if args.no_filter else "correct_with_cot"}
     _print_actor(name, summary, meta)
 
     if not args.no_wandb:
@@ -92,8 +98,8 @@ async def run_actor(name, args):
             cfg = wl.run_config(describe=roster.describe(name), n_items=len(kept), n_samples=args.n_samples,
                                 seed=args.seed, dataset="gpqa", dataset_hash=wl.dataset_hash([it.id for it in kept]),
                                 hint_family="arithmetic", sampling={"temperature": args.temperature, "max_tokens": max_tokens},
-                                levels=str(list(levels)), item_filter="correct_with_cot")
-            run = wl.WandbRun(experiment="exp_hints_sweep", actor=name, gate="gate1",
+                                levels=str(list(levels)), item_filter="none" if args.no_filter else "correct_with_cot")
+            run = wl.WandbRun(experiment=experiment, actor=name, gate="gate1",
                               mode=args.wandb_mode, config=cfg)
             for r in records:
                 run.log_rollout(**solver.rollout_row(r, id2item[r.item_id]))
@@ -102,8 +108,10 @@ async def run_actor(name, args):
         except Exception as e:  # noqa: BLE001
             print(f"  [wandb skipped for {name}: {e}]")
 
-    Path("logs").mkdir(exist_ok=True)
-    Path(f"logs/sweep_{name}.json").write_text(json.dumps({"summary": summary, "meta": meta}, indent=2, default=str))
+    if not args.dry:        # dry results are tiny-N — never let them clobber a real (un)filtered log
+        Path("logs").mkdir(exist_ok=True)
+        Path(f"logs/sweep_{name}{tag}.json").write_text(
+            json.dumps({"summary": summary, "meta": meta}, indent=2, default=str))
     return summary, meta
 
 
@@ -157,9 +165,11 @@ async def main(args):
         except Exception as e:  # noqa: BLE001
             print(f"  {name} FAILED: {e}")
             metas[name] = None
-    Path("logs/sweep_all.json").write_text(json.dumps(
-        {"args": vars(args), "summaries": summaries, "metas": metas}, indent=2, default=str))
-    print(f"\ncombined -> logs/sweep_all.json")
+    tag = "_unfiltered" if args.no_filter else ""
+    if not args.dry:
+        Path(f"logs/sweep_all{tag}.json").write_text(json.dumps(
+            {"args": vars(args), "summaries": summaries, "metas": metas}, indent=2, default=str))
+        print(f"\ncombined -> logs/sweep_all{tag}.json")
     if args.dry:
         _cost_projection(metas, args)
 
