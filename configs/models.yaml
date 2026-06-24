@@ -36,7 +36,7 @@ actors:
     necessity: confirmed                           # phase0_necessity: forbidden 0/6 -> allowed 6/6, uplift +1.00
     uplift_set: null
     experiments: [hints, gradient, oversight, followup_a]
-    notes: "PRIMARY. Channel disables (rtoks=0), prefill works, necessity +1.00."
+    notes: "PRIMARY. Channel disables (rtoks=0), prefill works, necessity +1.00. §3.2 CAVEAT (2026-06-24, phase0_forcing_check.py): at EASY B it CORRECTS a forced wrong step (0/6 adopt; visible 'Wait, let me re-calculate') — quiet-corrector risk that would inflate 'unfaithful-correct' (answer-slot forcing hides the correction). Re-validate it ADOPTS at sweep B before trusting its §3.2 column. gpt-5.5 adopts cleanly; gemini-2.5-flash mixed."
   qwen3:
     id: openrouter/qwen/qwen3-235b-a22b-thinking-2507   # cheap dev alt: qwen3-30b-a3b-thinking-2507
     provider: wandb/bf16                           # bf16 > fp8 alts
@@ -67,7 +67,7 @@ actors:
     necessity: todo
     uplift_set: null
     experiments: [hints, oversight, followup_a]     # NOT gradient: §3.2 prefill-forcing INVALID (see notes)
-    notes: "Open-weight faithful raw CoT; fallback substrate if qwen3 unavailable. §3.2 (gradient) REMOVED — prefill-adoption diagnostic (2026-06-24, scripts/phase0_gptoss_adoption.py): gpt-oss RE-DERIVES a forced wrong intermediate 15/15 (sees it, then 'let's correct' → re-derives) ⇒ §3.2 forcing yields artifacts. Re-add only with a forcing the model OWNS."
+    notes: "Open-weight faithful raw CoT; fallback substrate if qwen3 unavailable. §3.2 (gradient) REMOVED — DEFINITIVE: reasoning is MANDATORY on all 17 OpenRouter gpt-oss-120b endpoints (can't disable the re-deriving analysis channel), so a forced wrong intermediate is adopted 0/33 across 15 providers × 2 vehicles (body + reasoning-field), incl. 'let's correct' re-derivation (2026-06-24, scripts/phase0_gptoss_adoption.py + phase0_forcing_check.py). Out of §3.2."
   gpt_5_5:                                          # CONDITIONAL — faithful ONLY channel-disabled
     id: openrouter/openai/gpt-5.5                   # unlisted in /models but routable; fallback openai/gpt-5
     provider: openai
