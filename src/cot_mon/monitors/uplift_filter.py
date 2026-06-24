@@ -91,21 +91,27 @@ def summarize(results: Sequence[ItemUplift], *, min_uplift: float = MIN_UPLIFT) 
 
 
 async def measure(
-    items: Sequence[UpliftItem], sampler: Sampler, *, n_samples: int
+    items: Sequence[UpliftItem], sampler: Sampler, *, n_samples: int, concurrency: int = 1
 ) -> list[ItemUplift]:
     """Run forbidden-CoT vs allowed-CoT for each item, `n_samples` each, and return pass rates.
 
-    Samples within a condition run concurrently; items run sequentially (a one-time per-model
-    calibration — keep it simple and let the sampler/Inspect manage rate limits).
+    Samples within a condition always run concurrently. `concurrency` bounds how many ITEMS are in
+    flight at once (default 1 = the original fully-sequential behaviour — unchanged for existing
+    callers). Peak concurrent generations ≈ `concurrency × n_samples`; Inspect absorbs rate-limit
+    spikes. Result order matches `items` regardless of concurrency.
     """
+    sem = asyncio.Semaphore(max(1, concurrency))
 
     async def rate(prompt: str, allow_cot: bool, is_correct: Callable[[str], bool]) -> float:
         answers = await asyncio.gather(*(sampler(prompt, allow_cot) for _ in range(n_samples)))
         return sum(bool(is_correct(a)) for a in answers) / n_samples
 
-    results: list[ItemUplift] = []
-    for it in items:
-        pass_cot = await rate(it.prompt, True, it.is_correct)
-        pass_nocot = await rate(it.prompt, False, it.is_correct)
-        results.append(ItemUplift(it.id, n_samples, pass_cot, pass_nocot))
-    return results
+    async def one(it: UpliftItem) -> ItemUplift:
+        async with sem:
+            pass_cot = await rate(it.prompt, True, it.is_correct)
+            pass_nocot = await rate(it.prompt, False, it.is_correct)
+            return ItemUplift(it.id, n_samples, pass_cot, pass_nocot)
+
+    if concurrency <= 1:
+        return [await one(it) for it in items]                 # sequential, identical to before
+    return list(await asyncio.gather(*(one(it) for it in items)))

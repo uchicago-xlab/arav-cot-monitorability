@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""§3.1 sweep figures (SPEC_phase2 Step 3 / figure rules). Reads per-actor logs/sweep_<actor>.json
-(whatever has completed), renders 4 figures to figures/, and logs them to W&B (wandb.Image + the
-underlying numbers as a wandb.Table so each plot is reproducible). Re-run as each actor lands.
+"""§3.1 REPLICATION (Gate-1 sweep) figures → figures/3p1_replication/ (SPEC_phase2 Step 3 / figure
+rules). Reads per-actor logs/sweep_<actor>.json (whatever has completed), renders 4 figures, and
+logs them to W&B (wandb.Image + the underlying numbers as a wandb.Table). Re-run as each actor lands.
 
   1 HEADLINE (Gate 1): simple-hint unfaithfulness delta per actor, Wilson 2σ        [REPLICATION]
   2 Necessity-gated complex: unfaithfulness | (CoT-necessary AND followed), per×level [EXTENSION]
-  3 Decode-necessity curve: follow with-CoT vs no-CoT across L1→L2→L3 (the flip)      [EXTENSION]
+  3 Decode-uplift bars: with-CoT − no-CoT follow-rate per actor×level, Newcombe 2σ,   [EXTENSION]
+    threshold +0.5; one-shot / too-hard / CoT-necessary coloured distinctly (Part B fix)
   4 Follow-rate panel: simple + complex follow_rate per actor×level (the denominators)
 
-Honesty rules enforced: a one-shot / declined / zero-follower cell is rendered as a grey hatched
-"no necessity window" marker with its follow-rate shown — NEVER as 0% unfaithful.
+Honesty rules enforced: a one-shot / declined / zero-follower cell is rendered distinctly (grey
+hatch / its raw (with-CoT,no-CoT) pair) — NEVER as a plain 0% bar.
 
   uv run python scripts/make_figures.py            # all completed actors, log to W&B
   uv run python scripts/make_figures.py --no-wandb
@@ -24,13 +25,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.patches import Patch  # noqa: E402
 
+from cot_mon import figviz  # noqa: E402
+
 ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gpt_5_5", "gpt_oss_120b", "qwen3_30b"]
 LABEL = {"gemini_2_5_flash": "gemini-2.5-flash\n(paper)", "gemini_3_flash": "gemini-3-flash",
          "gpt_5_5": "gpt-5.5", "gpt_oss_120b": "gpt-oss-120b", "qwen3_30b": "qwen3-30b"}
 LEVELS = ["complex_L1", "complex_L2", "complex_L3"]
 LV_SHORT = {"complex_L1": "L1", "complex_L2": "L2", "complex_L3": "L3"}
 GREY = "#b0b0b0"
-FIGDIR = Path("figures")
+FIGDIR = Path("figures/3p1_replication")
 
 
 def load():
@@ -127,39 +130,39 @@ def fig_necessity_gated(summaries):
     return _save(fig, "fig2_necessity_gated")
 
 
-# ── 3. Decode-necessity curve ──
-def fig_decode_necessity(summaries):
-    names = [n for n in ORDER if n in summaries]
-    fig, axes = plt.subplots(1, len(names), figsize=(3.4 * len(names), 4.2), sharey=True, squeeze=False)
-    xs = range(len(LEVELS))
-    for ax, n in zip(axes[0], names):
-        s = summaries[n]
-        wc = [s[lv]["follow_withcot"] for lv in LEVELS if lv in s]
-        nc = [s[lv]["follow_nocot"] for lv in LEVELS if lv in s]
-        ax.errorbar(xs, [c["p"] for c in wc], yerr=_join(wc), fmt="-o", color="#1b9e77",
-                    capsize=3, label="with-CoT")
-        ax.errorbar(xs, [c["p"] for c in nc], yerr=_join(nc), fmt="--s", color="#d95f02",
-                    capsize=3, label="no-CoT (forced)")
-        for li, lv in enumerate(LEVELS):
-            if lv in s:
-                ax.text(li, 1.02, {"cot_necessary": "✓CoT-nec", "one_shot": "1-shot",
-                                   "declines": "declines"}[s[lv]["necessity"]],
-                        ha="center", fontsize=6.5, color="#555")
-        ax.set_xticks(list(xs))
-        ax.set_xticklabels([LV_SHORT[lv] for lv in LEVELS])
-        ax.set_title(LABEL[n], fontsize=9)
-        ax.set_ylim(0, 1.12)
-        ax.grid(alpha=0.3)
-    axes[0][0].set_ylabel("decode success = picks the hinted letter")
-    axes[0][-1].legend(fontsize=8, loc="center right")
-    fig.suptitle("Fig 3 — EXTENSION: decode-necessity (where each actor flips one-shot → CoT-necessary "
-                 "as level rises)\n" + _caption(summaries), fontsize=10)
-    fig.tight_layout(rect=[0, 0, 1, 0.93])
-    return _save(fig, "fig3_decode_necessity")
+# ── 3. Decode-uplift bars (Part B fix — replaces the crushed two-line curve) ──
+def _repl_cells(summaries):
+    """Replication decode cells. Here the decode-accuracy PROXY is the follow-rate (picks the hinted
+    letter) — this experiment is follow-based, so a near-zero/negative uplift on complex levels means
+    the actor DECLINES (too-hard-to-follow), while simple is one-shot (cue needs no CoT). The TRUE
+    decode-accuracy version (does the model compute the letter at all) is the 3p1_complex_hints run."""
+    conds = [("simple", "simple", "simple")] + [(lv, "arithmetic", LV_SHORT[lv]) for lv in LEVELS]
+    cells = []
+    for n in ORDER:
+        s = summaries.get(n)
+        if not s:
+            continue
+        for key, fam, lvl in conds:
+            c = s.get(key)
+            if not c:
+                continue
+            wc, nc = c["follow_withcot"], c["follow_nocot"]
+            cells.append(figviz.Cell(actor=n, family=fam, level=lvl,
+                                     k_cot=wc["k"], n_cot=wc["n"], k_nocot=nc["k"], n_nocot=nc["n"]))
+    return cells
 
 
-def _join(stats):
-    return [[max(0, c["p"] - c["lo"]) for c in stats], [max(0, c["hi"] - c["p"]) for c in stats]]
+def fig_decode_uplift(summaries):
+    cells = _repl_cells(summaries)
+    fig, ax = plt.subplots(figsize=(11, 5.6))
+    figviz.draw_uplift_bars(
+        ax, cells, group_attr="actor", series=["simple", "L1", "L2", "L3"], group_order=ORDER,
+        group_label=LABEL, metric_label="follow-based proxy: picks the hinted letter",
+        title="Fig 3 — EXTENSION: decode-uplift = with-CoT − no-CoT follow-rate, per actor × level "
+              "(Newcombe 2σ)\n" + _caption(summaries) +
+              " · annotations = (with-CoT, no-CoT); bars above +0.5 = CoT-necessary")
+    fig.tight_layout()
+    return _save(fig, "fig3_decode_uplift")
 
 
 # ── 4. Follow-rate panel ──
@@ -225,7 +228,7 @@ def main(args):
         return
     print(f"actors with data: {list(summaries)}")
     paths = [fig_headline(summaries), fig_necessity_gated(summaries),
-             fig_decode_necessity(summaries), fig_follow_rate(summaries)]
+             fig_decode_uplift(summaries), fig_follow_rate(summaries)]
     for p in paths:
         print(f"  saved {p}")
 

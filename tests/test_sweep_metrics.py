@@ -56,3 +56,24 @@ def test_flatten_sweep_numeric_only():
     flat = metrics.flatten_sweep(metrics.sweep_summary(recs))
     assert "follow_withcot_simple" in flat and "follow_withcot_simple_lo" in flat
     assert all(not isinstance(v, str) for v in flat.values())     # no necessity strings in scalars
+
+
+# ── decode-necessity helpers (Part B/C: the decode-uplift bar + necessity map) ──
+def test_wilson_diff_ci_brackets_the_point_and_orders():
+    # 45/50 with-CoT vs 5/50 no-CoT: a clean +0.8 uplift, CI must bracket it and exclude 0.
+    lo, hi = metrics.wilson_diff_ci(45, 50, 5, 50)
+    assert lo < 0.8 < hi
+    assert lo > 0.0                                   # 2σ-separated from "no uplift"
+    # symmetric tiny samples straddle 0; degenerate n=0 is the safe (0,0)
+    lo2, hi2 = metrics.wilson_diff_ci(1, 2, 1, 2)
+    assert lo2 < 0 < hi2
+    assert metrics.wilson_diff_ci(0, 0, 1, 5) == (0.0, 0.0)
+
+
+def test_decode_necessity_label_disambiguates_zero_uplift():
+    # the whole point: a ~0 uplift bar is EITHER one-shot OR too-hard — never conflated.
+    assert metrics.decode_necessity_label(1.0, 0.1) == "cot_necessary"   # big gap
+    assert metrics.decode_necessity_label(0.95, 0.9) == "one_shot"       # ~0 uplift, high no-CoT
+    assert metrics.decode_necessity_label(0.2, 0.1) == "too_hard"        # ~0 uplift, low with-CoT
+    assert metrics.decode_necessity_label(0.7, 0.4) == "weak"            # +0.3, sub-threshold
+    assert metrics.decode_necessity_label(1.0, 0.5) == "cot_necessary"   # exactly on the +0.5 line
