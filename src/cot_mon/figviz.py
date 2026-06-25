@@ -36,8 +36,21 @@ STYLE = {
     "one_shot":      {"color": "#3182bd", "hatch": "..", "label": "one-shot (no-CoT high → no CoT needed)"},
     "too_hard":      {"color": "#b0b0b0", "hatch": "xx", "label": "too-hard (with-CoT low → can't even w/ CoT)"},
     "weak":          {"color": "#fdae61", "hatch": "//", "label": "weak (0 < uplift < 0.5)"},
+    # FOLLOW-rate figs only (Fig 3): low follow in BOTH arms — the model declines the costly hint.
+    # NOT "too-hard": the decode itself is CoT-necessary (decode-accuracy figs C1/C2 show with-CoT ≈ 1.0).
+    "declines":      {"color": "#9e9ac8", "hatch": "\\\\", "label": "declines (low follow, both arms)"},
 }
-GLYPH = {"cot_necessary": "✓", "one_shot": "1", "too_hard": "✗", "weak": "~"}
+GLYPH = {"cot_necessary": "✓", "one_shot": "1", "too_hard": "✗", "weak": "~", "declines": "↓"}
+
+
+def follow_uplift_verdict(cell: "Cell") -> str:
+    """Necessity verdict for a FOLLOW-rate uplift cell (Fig 3), where acc_* are follow-rates, NOT
+    decode accuracy. Same thresholds as metrics.decode_necessity_label, except the low-with-CoT branch
+    is 'declines' (the model rarely follows the costly hint in EITHER arm) rather than 'too-hard' —
+    'too-hard' would (wrongly) say it can't compute the decode, but C1/C2 show the decode IS
+    CoT-necessary (with-CoT decode ≈ 1.0). So a near-zero follow uplift = a choice not to pay the cost."""
+    lbl = metrics.decode_necessity_label(cell.acc_cot, cell.acc_nocot, threshold=THRESHOLD)
+    return "declines" if lbl == "too_hard" else lbl
 
 
 @dataclass
@@ -80,10 +93,15 @@ def _yerr(cell: Cell):
 
 def draw_uplift_bars(ax, cells: list[Cell], *, group_attr: str, series: list[str],
                      group_order: list[str], group_label: dict, metric_label: str, title: str,
-                     legend: bool = True):
+                     legend: bool = True, ylabel: str | None = None, verdict_fn=None):
     """Grouped decode-uplift bar chart. x = `group_attr` (actor or family); bars within a group =
     `series` (levels). Colour/hatch = necessity verdict; each bar annotated with its (with-CoT,
-    no-CoT) pair. Threshold line at +0.5. Ports fig4's readability onto the necessity metric."""
+    no-CoT) pair. Threshold line at +0.5. Ports fig4's readability onto the necessity metric.
+
+    `verdict_fn(cell) -> verdict-key` overrides the per-bar category (default = the decode-accuracy
+    `cell.verdict`); Fig 3 passes `follow_uplift_verdict` so low-follow bars read 'declines', not
+    'too-hard'. `ylabel` overrides the y-axis text (default is the decode-accuracy phrasing)."""
+    vfn = verdict_fn or (lambda c: c.verdict)
     groups = [g for g in group_order if any(getattr(c, group_attr) == g for c in cells)]
     by = {(getattr(c, group_attr), c.level): c for c in cells}
     width = 0.8 / max(len(series), 1)
@@ -93,7 +111,7 @@ def draw_uplift_bars(ax, cells: list[Cell], *, group_attr: str, series: list[str
             if c is None:
                 continue
             x = gi + (li - (len(series) - 1) / 2) * width
-            st = STYLE[c.verdict]
+            st = STYLE[vfn(c)]
             ax.bar(x, c.uplift, width=width, color=st["color"], hatch=st["hatch"],
                    edgecolor="black", linewidth=0.7)
             ax.errorbar(x, c.uplift, yerr=_yerr(c), fmt="none", ecolor="black", capsize=2.5, lw=1)
@@ -107,17 +125,19 @@ def draw_uplift_bars(ax, cells: list[Cell], *, group_attr: str, series: list[str
     ax.axhline(0, color="black", lw=0.8)
     ax.set_xticks(range(len(groups)))
     ax.set_xticklabels([group_label.get(g, g) for g in groups], fontsize=8.5)
-    ax.set_ylabel(f"decode-uplift = with-CoT − no-CoT\n({metric_label})")
+    ax.set_ylabel(ylabel if ylabel is not None else f"decode-uplift = with-CoT − no-CoT\n({metric_label})")
     ax.set_ylim(min(-0.6, ax.get_ylim()[0]), 1.22)   # headroom for the rotated (wCoT,noCoT) annotations
     ax.set_title(title, fontsize=9.5)
     if legend:
-        ax.legend(handles=verdict_legend_handles(cells), fontsize=6.8, loc="lower right", framealpha=0.92)
+        ax.legend(handles=verdict_legend_handles(cells, verdict_fn=vfn), fontsize=6.8,
+                  loc="lower right", framealpha=0.92)
 
 
-def verdict_legend_handles(cells: list[Cell]):
+def verdict_legend_handles(cells: list[Cell], *, verdict_fn=None):
     """Legend patches for the verdicts present in `cells` (+ the reused marker) — shared by the
     per-axes legend and the figure-level legend in the faceted complex figure."""
-    seen = [k for k in STYLE if any(c.verdict == k for c in cells)]
+    vfn = verdict_fn or (lambda c: c.verdict)
+    seen = [k for k in STYLE if any(vfn(c) == k for c in cells)]
     handles = [Patch(facecolor=STYLE[k]["color"], hatch=STYLE[k]["hatch"], edgecolor="black",
                      label=STYLE[k]["label"]) for k in seen]
     if any(c.source == "reused" for c in cells):
