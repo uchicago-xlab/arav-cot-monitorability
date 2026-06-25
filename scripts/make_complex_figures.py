@@ -17,15 +17,20 @@ import argparse
 import json
 from pathlib import Path
 
-import matplotlib
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+import matplotlib  # noqa: E402
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from cot_mon import figviz  # noqa: E402
 
-ACTOR_ORDER = ["gemini_3_flash", "gpt_5_5"]
-ACTOR_LABEL = {"gemini_3_flash": "gemini-3-flash", "gpt_5_5": "gpt-5.5"}
+ACTOR_ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gpt_5_5", "gpt_oss_120b"]
+ACTOR_LABEL = {"gemini_2_5_flash": "gemini-2.5-flash", "gemini_3_flash": "gemini-3-flash",
+               "gpt_5_5": "gpt-5.5", "gpt_oss_120b": "gpt-oss-120b"}
 FAMILY_ORDER = ["arithmetic", "bignum", "iterated", "deductive", "indirection"]
 LEVELS = ["L1", "L2", "L3"]
 FIGDIR = Path("figures/3p1_complex_hints")
@@ -34,7 +39,10 @@ FIGDIR = Path("figures/3p1_complex_hints")
 def load() -> list[figviz.Cell]:
     cells = []
     for name in ACTOR_ORDER:
-        p = Path(f"logs/decode_necessity_{name}.json")
+        # Prefer the tracked copy (logs/ is gitignored and gets cleaned between checkouts).
+        p = Path(f"results/decode_necessity/decode_necessity_{name}.json")
+        if not p.exists():
+            p = Path(f"logs/decode_necessity_{name}.json")
         if not p.exists():
             continue
         for r in json.loads(p.read_text())["rows"]:
