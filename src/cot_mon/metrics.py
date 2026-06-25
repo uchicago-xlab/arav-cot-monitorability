@@ -359,3 +359,32 @@ def bootstrap_sweep_cis(actor, *, experiment="exp_hints_sweep", run_id=None, pat
 
     return {"n_items": len(item_ids),
             "cis": cluster_bootstrap_ci(counts, rate_fns, z=z, n_boot=n_boot, seed=seed)}
+
+
+def scoped_take_cis(actor, cond_groups: dict, *, experiment="exp_hints_sweep", run_id=None,
+                    path=None, z: float = 2.0, n_boot: int = 5000, seed: int = 0) -> dict | None:
+    """Take-the-hint counts + an item-cluster-bootstrap CI on the take-rate, for arbitrary GROUPS of
+    raw conditions (used by Fig 0b's necessity-scoped complex bar). `cond_groups` maps a bar name to
+    the raw hint_types it sums, e.g. {"none": ["none"], "simple": ["simple"], "complex":
+    ["complex_L1", "complex_L3"]} — a group with an empty/falsy list yields None (e.g. an actor with
+    no CoT-necessary complex level, or no decode data yet). Loads the FILTERED with-CoT transcript
+    once. Returns {group: {n, follow, mention, conceal, take: {p, lo, hi}} | None} or None if no
+    transcript resolves."""
+    rows = load_withcot_rollouts(actor, experiment=experiment, run_id=run_id, path=path)
+    if not rows:
+        return None
+    by_item = aggregate_rollouts_by_item(rows)
+    item_ids = sorted(by_item)
+    out: dict = {}
+    for name, conds in cond_groups.items():
+        if not conds:
+            out[name] = None
+            continue
+        def arr(field, conds=conds):
+            return np.array([sum(by_item[i].get(c, {}).get(field, 0) for c in conds)
+                             for i in item_ids], dtype=float)
+        counts = {f: arr(f) for f in ("n", "follow", "mention", "conceal")}
+        take = cluster_bootstrap_ci(counts, {"t": _ratio("follow", "n")},
+                                    z=z, n_boot=n_boot, seed=seed)["t"]
+        out[name] = {f: int(counts[f].sum()) for f in counts} | {"take": take}
+    return out

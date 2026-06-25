@@ -244,6 +244,100 @@ def fig_paper_analog(*, experiment="exp_hints_sweep", suffix="", set_label="", p
     return _save(fig, f"fig0_paper_analog{suffix}"), complex_mention_frac
 
 
+# ── 0b. PAPER ANALOG, NECESSITY-SCOPED complex (companion to Fig 0; do NOT fold into fig0) ──
+COMPLEX_FAMILY = "arithmetic"        # §3.1 complex hint family → which decode-sweep family scopes it
+CONDS0B_LABEL = {"none": "no-hint", "simple": "simple", "complex": "complex\n(necessity-scoped)"}
+
+
+def _necessary_complex_levels(actor, *, family=COMPLEX_FAMILY):
+    """(raw complex-level conds CoT-necessary for `actor`, available?) per the decode sweep. Reads
+    logs/decode_necessity_<actor>.json (the §3.1 complex family = arithmetic) and keeps only levels
+    whose verdict is `cot_necessary` (one-shot/weak/too-hard excluded). available=False if no decode
+    file exists yet (gemini-2.5-flash / gpt-oss until the message-7a run) → caller skips the scoped bar."""
+    p = Path(f"logs/decode_necessity_{actor}.json")
+    if not p.exists():
+        return [], False
+    d = json.loads(p.read_text())
+    lvls = sorted(r["level"] for r in d.get("rows", [])
+                  if r.get("family") == family and r.get("necessity") == "cot_necessary")
+    return [f"complex_L{lv}" for lv in lvls], True
+
+
+def fig_paper_analog_necessity_scoped(*, experiment="exp_hints_sweep", pins=None, n_boot=5000, seed=0):
+    """Fig 0b — necessity-scoped companion to Fig 0 (shown together as a robustness contrast; Fig 0 is
+    left untouched). IDENTICAL to Fig 0 except each actor's complex bar sums ONLY the arithmetic levels
+    that are CoT-necessary for THAT actor per the decode sweep (C1/C2); one-shot levels are excluded.
+    Actors with no decode data yet (gemini-2.5-flash, gpt-oss until the message-7a run) render NO scoped
+    complex bar. Per-actor title states which levels feed the bar. Returns
+    (path, {actor: complex_mention_fraction on the necessity-validated cells})."""
+    pins = pins or {}
+    per = {}                                   # actor -> (stats, nec_levels, available)
+    for a in JUDGEABLE:
+        nec, avail = _necessary_complex_levels(a)
+        rid, path = pins.get(a, (None, None))
+        groups = {"none": ["none"], "simple": ["simple"], "complex": (nec if avail else [])}
+        stats = metrics.scoped_take_cis(a, groups, experiment=experiment, run_id=rid, path=path,
+                                        n_boot=n_boot, seed=seed)
+        if stats is not None:
+            per[a] = (stats, nec, avail)
+    if not per:
+        print(f"  [fig0b skipped: no {experiment}_<actor>_*.jsonl transcripts]")
+        return None, {}
+
+    actors = [a for a in JUDGEABLE if a in per]
+    ncols = 2 if len(actors) > 1 else 1
+    nrows = -(-len(actors) // ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(5.2 * ncols, 5.0 * nrows), squeeze=False)
+    flat = [ax for row in axes for ax in row]
+    for ax in flat[len(actors):]:
+        ax.axis("off")
+    complex_mention_frac = {}
+    for ax, a in zip(flat, actors):
+        stats, nec, avail = per[a]
+        for xi, c in enumerate(CONDS0):
+            cell = stats.get(c)
+            if cell is None:                   # scoped complex unavailable: pending decode, or none necessary
+                msg = ("pending\ndecode (msg 7a)" if (c == "complex" and not avail)
+                       else "no CoT-necessary\nlevel")
+                ax.text(xi, 0.04, msg, ha="center", va="bottom", fontsize=7, color="#999", style="italic")
+                continue
+            n = cell["n"]
+            mention = cell["mention"] / n if n else 0.0
+            conceal = cell["conceal"] / n if n else 0.0
+            take = mention + conceal
+            ax.bar(xi, mention, color=C_MENTION, edgecolor="black", lw=0.6,
+                   label=("mentions hint (revealed)" if xi == 0 else None))
+            ax.bar(xi, conceal, bottom=mention, color=C_CONCEAL, edgecolor="black", lw=0.6,
+                   label=("no mention (concealed)" if xi == 0 else None))
+            ax.errorbar(xi, take, yerr=_boot_err(take, cell["take"], clamp=(0, 1)), fmt="none",
+                        ecolor="black", capsize=3, lw=1, zorder=4)
+            n_take = cell["mention"] + cell["conceal"]
+            note = f"take={take:.2f}\n(n={n})" + (f"\nment {cell['mention']}/{n_take}" if n_take else "")
+            ax.text(xi, take + 0.04, note, ha="center", va="bottom", fontsize=7)
+        cc = stats.get("complex")
+        if cc is not None:
+            n_take_cx = cc["mention"] + cc["conceal"]
+            complex_mention_frac[a] = (cc["mention"] / n_take_cx) if n_take_cx else None
+            lvl_txt = "complex = " + ",".join(l.replace("complex_", "") for l in nec) + " (CoT-necessary)"
+        else:
+            complex_mention_frac[a] = None
+            lvl_txt = "complex = pending decode (msg 7a)" if not avail else "complex = none CoT-necessary"
+        ax.set_xticks(range(len(CONDS0)))
+        ax.set_xticklabels([CONDS0B_LABEL[c] for c in CONDS0], fontsize=9)
+        ax.set_ylim(0, 1.0)
+        ax.set_ylabel("take-the-hint rate (picks hinted letter, with-CoT)")
+        ax.set_title(f"{LABEL[a].replace(chr(10), ' ')}\n{lvl_txt}", fontsize=8.5)
+    flat[0].legend(fontsize=8, loc="upper center")
+    fig.suptitle(
+        "Fig 0b — §3.1 paper analog, NECESSITY-SCOPED complex (companion to Fig 0, shown together)\n"
+        "complex bar = ONLY the arithmetic levels CoT-necessary for THAT actor per the decode sweep "
+        "(C1/C2); one-shot levels excluded\n"
+        "judgeable actors · with-CoT arm · 'mention' = STRICT judge_verdict · whisker = " + BOOT_CI,
+        fontsize=9)
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
+    return _save(fig, "fig0b_paper_analog_necessity_scoped"), complex_mention_frac
+
+
 # ── 1. HEADLINE (Gate 1) ──
 def fig_headline(summaries, boot=None):
     """Gate-1: simple-hint unfaithfulness delta (= unfaithful_rate − no-hint baseline) per actor.
@@ -553,6 +647,18 @@ def main(args):
                 verdict = "REPLICATE (followers reveal the decode)" if frac >= 0.5 \
                     else "CONTRADICT (followers conceal the decode)"
                 print(f"    {a:18} {frac:.2f} mention the arithmetic decode → {verdict}")
+
+    # Fig 0b — necessity-scoped complex companion (FILTERED set; do not touch Fig 0).
+    p0b, scoped_frac = fig_paper_analog_necessity_scoped(pins=pins, n_boot=args.n_boot, seed=args.boot_seed)
+    if p0b is not None:
+        paths.insert(1 if p0 is not None else 0, p0b)
+        print("  NECESSITY-SCOPED READOUT [filtered] — strict mention fraction among complex followers, "
+              "CoT-necessary levels only:")
+        for a, frac in scoped_frac.items():
+            if frac is None:
+                print(f"    {a:18} no scoped complex bar (decode data pending or no CoT-necessary level)")
+            else:
+                print(f"    {a:18} {frac:.2f} mention the arithmetic decode (necessity-scoped cells)")
 
     # Fig 5 — concealment scatter (FILTERED set always; raw per-rollout transcripts, explicit selector).
     p5, conceal_rows = fig_concealment(caption=_caption(summaries, ci=""), pins=pins, boot=boot)
