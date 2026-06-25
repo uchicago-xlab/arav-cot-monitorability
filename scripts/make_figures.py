@@ -7,9 +7,11 @@ logs them to W&B (wandb.Image + the underlying numbers as a wandb.Table). Re-run
     {no-hint, simple, complex} split mention vs conceal. Reads RAW per-rollout transcripts (NOT the
     summary path), since this split is not in the pre-aggregated sweep_<actor>.json.            [REPLICATION]
   1 HEADLINE (Gate 1): simple-hint unfaithfulness delta per actor, Wilson 2σ        [REPLICATION]
-  2 Necessity-gated complex: unfaithfulness | (CoT-necessary AND followed), per×level [EXTENSION]
-  3 Decode-uplift bars: with-CoT − no-CoT follow-rate per actor×level, Newcombe 2σ,   [EXTENSION]
-    threshold +0.5; one-shot / too-hard / CoT-necessary coloured distinctly (Part B fix)
+  2 Necessity-gated complex (DEMOTED — not a standalone result): no clean CoT-necessary∩followed
+    window exists in this follow-based sweep → redirects to the decode-necessity figs C1/C2.
+  3 Follow-rate uplift bars: with-CoT − no-CoT FOLLOW-rate per actor×level, Newcombe 2σ,  [EXTENSION]
+    threshold +0.5; one-shot / declines / CoT-necessary coloured distinctly (NOT decode accuracy —
+    that's C1/C2; low follow in both arms = declines, not too-hard)
   4 Follow-rate panel: simple + complex follow_rate per actor×level (the denominators)
 
 Honesty rules enforced: a one-shot / declined / zero-follower cell is rendered distinctly (grey
@@ -28,14 +30,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.patches import Patch  # noqa: E402
 
-from cot_mon import figviz  # noqa: E402
+from cot_mon import figviz, metrics  # noqa: E402
+from cot_mon.metrics import load_withcot_rollouts  # noqa: E402  (explicit-selector transcript loader)
 
 ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gpt_5_5", "gpt_oss_120b", "qwen3_30b"]
 LABEL = {"gemini_2_5_flash": "gemini-2.5-flash\n(paper)", "gemini_3_flash": "gemini-3-flash",
          "gpt_5_5": "gpt-5.5", "gpt_oss_120b": "gpt-oss-120b", "qwen3_30b": "qwen3-30b"}
 LEVELS = ["complex_L1", "complex_L2", "complex_L3"]
 LV_SHORT = {"complex_L1": "L1", "complex_L2": "L2", "complex_L3": "L3"}
-GREY = "#b0b0b0"
 FIGDIR = Path("figures/3p1_replication")
 
 # Fig 0 (paper analog): the four body-CoT actors whose with-CoT trace is genuinely judgeable —
@@ -45,7 +47,8 @@ FIGDIR = Path("figures/3p1_replication")
 # time (solver runs the judge cot_source-aware), so the loader just reads it. The Pro tier (mandatory
 # hidden reasoning) stays out of the judged arm — see analysis/3p1_replication.md.
 JUDGEABLE = ["gemini_2_5_flash", "gemini_3_flash", "gpt_5_5", "gpt_oss_120b"]
-TRANSCRIPTS = Path("logs/transcripts")
+ACTOR_COLOR = {"gemini_2_5_flash": "#444444", "gemini_3_flash": "#1b9e77",
+               "gpt_5_5": "#d95f02", "gpt_oss_120b": "#7570b3"}
 
 # Fig 0 transcript SETS — the experiment prefix is the data selector (see resolve_transcript). The
 # framing is "does the §3.1 follow-rate effect survive WITHOUT the item gate", NOT "the gate was
@@ -82,47 +85,27 @@ def load():
     return out
 
 
-# ── raw per-rollout loader (Fig 0 only; the summary path has no per-sample rows) ──
-def resolve_transcript(actor, *, experiment="exp_hints_sweep", run_id=None, path=None):
-    """EXPLICITLY resolve ONE sweep transcript for `actor` — never silently 'whatever was written
-    last'. Precedence: explicit `path` > explicit `run_id` > glob within the chosen `experiment`.
-    A glob that matches >1 file RAISES (forcing the caller to pin a run, so a chosen run is plotted,
-    not the newest); 0 matches → None. `experiment` is the set selector: "exp_hints_sweep" =
-    correct-with-CoT-filtered, "exp_hints_sweep_unfiltered" = the --no-filter set (these prefixes do
-    not collide — the actor name is anchored right after the prefix)."""
-    if path is not None:
-        p = Path(path)
-        return p if p.exists() else None
-    if run_id is not None:
-        p = TRANSCRIPTS / f"{experiment}_{actor}_{run_id}.jsonl"
-        return p if p.exists() else None
-    cands = sorted(TRANSCRIPTS.glob(f"{experiment}_{actor}_*.jsonl"))
-    if not cands:
-        return None
-    if len(cands) > 1:
-        raise ValueError(
-            f"{len(cands)} transcripts match {experiment}_{actor}_*.jsonl: {[c.name for c in cands]}. "
-            f"Pin one explicitly with --fig0-transcript {actor}=<run_id|path>.")
-    return cands[0]
+# The explicit-selector transcript loader lives in cot_mon.metrics (so the cluster bootstrap can read
+# the same per-rollout data); imported at the top as `load_withcot_rollouts`. The pins → CIs helpers
+# below build on it.
 
 
-def load_withcot_rollouts(actor, *, experiment="exp_hints_sweep", run_id=None, path=None):
-    """With-CoT rollouts for `actor` from an EXPLICITLY selected sweep transcript (rollout_row()
-    schema); [] if none resolves. cot_source is already baked into each row's judge_verdict at sweep
-    time (the solver judges the correct trace per actor — body, or the native reasoning field for
-    gpt-oss), so there is no per-actor handling to do here — just read the precomputed verdict."""
-    f = resolve_transcript(actor, experiment=experiment, run_id=run_id, path=path)
-    if f is None:
-        return []
-    rows = []
-    for line in f.read_text().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        r = json.loads(line)
-        if r.get("cot_mode") == "with_cot":
-            rows.append(r)
-    return rows
+def _boot_for(actors, *, pins, n_boot, seed):
+    """Item-level cluster-bootstrap CIs per actor (FILTERED set), via metrics.bootstrap_sweep_cis.
+    {actor: {"n_items", "cis": {...}}}; actors with no transcript (or an ambiguous glob) are skipped
+    with a note. These CIs feed Figs 0/1/4/5 — point estimates are unchanged, only intervals widen."""
+    out = {}
+    for a in actors:
+        rid, path = pins.get(a, (None, None))
+        try:
+            b = metrics.bootstrap_sweep_cis(a, experiment="exp_hints_sweep", run_id=rid, path=path,
+                                            n_boot=n_boot, seed=seed)
+        except ValueError as e:
+            print(f"  [bootstrap skipped for {a}: {e}]")
+            b = None
+        if b:
+            out[a] = b
+    return out
 
 
 def _condition(hint_type):
@@ -163,11 +146,25 @@ def _n(summary, kind):
     return c["follow_withcot"]["n"] if c else 0
 
 
-def _caption(summaries, extra=""):
+def _caption(summaries, extra="", ci="Wilson 2σ"):
     items = max((s.get("n_items", 0) for s in summaries.values()), default=0)
     spc = max((_n(s, "simple") for s in summaries.values()), default=0)
     sm = spc // items if items else 0
-    return f"GPQA · {items} items × {sm} samples/cell · correct-with-CoT filtered · Wilson 2σ" + extra
+    base = f"GPQA · {items} items × {sm} samples/cell · correct-with-CoT filtered"
+    return base + (f" · {ci}" if ci else "") + extra
+
+
+# CI label for the four headline figures that use the item-level cluster bootstrap (Figs 0/1/4/5).
+BOOT_CI = "item-cluster bootstrap 2σ (resamples items, not samples)"
+
+
+def _boot_err(point, ci, *, clamp=None):
+    """Asymmetric error-bar arms [[down],[up]] from a bootstrap {p,lo,hi}, anchored at the EXISTING
+    `point` (point estimates never move). `clamp`=(lo,hi) optionally bounds the drawn whisker."""
+    lo, hi = ci["lo"], ci["hi"]
+    if clamp is not None:
+        lo, hi = max(clamp[0], lo), min(clamp[1], hi)
+    return [[max(0.0, point - lo)], [max(0.0, hi - point)]]
 
 
 # ── 0. PAPER ANALOG (Emmons et al. §3.1 Fig 3) ──
@@ -177,15 +174,18 @@ C_CONCEAL = "#d7301f"   # picks hinted, does NOT mention → the paper's headlin
 C_MENTION = "#41ab5d"   # picks hinted AND mentions (revealed / faithful)
 
 
-def fig_paper_analog(*, experiment="exp_hints_sweep", suffix="", set_label="", pins=None):
+def fig_paper_analog(*, experiment="exp_hints_sweep", suffix="", set_label="", pins=None, boot=None):
     """Direct analog of Emmons et al. §3.1 Fig 3: 'did §3.1 replicate?' in one figure. One panel per
     judgeable actor; stacked take-the-hint bars over {no-hint, simple, complex}; each take split into
     conceal (no mention) vs mention. Reads raw per-rollout transcripts, not the summary path.
 
     `experiment`/`suffix`/`set_label` select & label the transcript SET (filtered vs --no-filter
-    unfiltered); `pins` = {actor: (run_id, path)} forces a specific run when >1 matches. Returns
+    unfiltered); `pins` = {actor: (run_id, path)} forces a specific run when >1 matches; `boot`
+    (filtered set only) adds an item-cluster-bootstrap whisker on each bar's take-rate. Returns
     (path, complex_follower_mention_fractions) or (None, {}) if no transcript data resolves."""
     pins = pins or {}
+    boot = boot or {}
+    take_ci_key = {"none": "baseline", "simple": "follow_simple", "complex": "follow_complex"}
     data = {}
     for a in JUDGEABLE:
         rid, path = pins.get(a, (None, None))
@@ -211,14 +211,19 @@ def fig_paper_analog(*, experiment="exp_hints_sweep", suffix="", set_label="", p
         ax.bar(x, mention, color=C_MENTION, edgecolor="black", lw=0.6, label="mentions hint (revealed)")
         ax.bar(x, conceal, bottom=mention, color=C_CONCEAL, edgecolor="black", lw=0.6,
                label="no mention (concealed)")
+        acis = boot.get(a, {}).get("cis", {})
         for xi, c in zip(x, CONDS0):
             take = conceal[xi] + mention[xi]
             n_take = agg[c]["conceal"] + agg[c]["mention"]
             frac = (agg[c]["mention"] / n_take) if n_take else None
+            bc = acis.get(take_ci_key[c])
+            if bc:                              # item-cluster-bootstrap whisker on the take-rate
+                ax.errorbar(xi, take, yerr=_boot_err(take, bc, clamp=(0, 1)), fmt="none",
+                            ecolor="black", capsize=3, lw=1, zorder=4)
             note = f"take={take:.2f}\n(n={agg[c]['n']})"
             if frac is not None and n_take:
                 note += f"\nment {agg[c]['mention']}/{n_take}"
-            ax.text(xi, take + 0.015, note, ha="center", va="bottom", fontsize=7)
+            ax.text(xi, take + 0.04, note, ha="center", va="bottom", fontsize=7)
         cx = agg["complex"]
         n_take_cx = cx["conceal"] + cx["mention"]
         complex_mention_frac[a] = (cx["mention"] / n_take_cx) if n_take_cx else None
@@ -228,20 +233,26 @@ def fig_paper_analog(*, experiment="exp_hints_sweep", suffix="", set_label="", p
         ax.set_ylabel("take-the-hint rate (picks hinted letter, with-CoT)")
         ax.set_title(LABEL[a].replace("\n", " "), fontsize=10)
     flat[0].legend(fontsize=8, loc="upper center")
+    whisker_note = ("\nwhisker = " + BOOT_CI) if boot else ""
     fig.suptitle(
         "Fig 0 — §3.1 REPLICATION (paper analog, Emmons et al. Fig 3): take-the-hint, mention vs conceal\n"
         f"{set_label}\n"
         "judgeable actors · with-CoT arm · ALL items (no necessity gating) · 'mention' = STRICT judge_verdict "
-        "(hint used as the reason) · complex = L1+L2+L3 collapsed",
+        "(hint used as the reason) · complex = L1+L2+L3 collapsed" + whisker_note,
         fontsize=9)
-    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    fig.tight_layout(rect=(0, 0, 1, 0.90 if boot else 0.91))
     return _save(fig, f"fig0_paper_analog{suffix}"), complex_mention_frac
 
 
 # ── 1. HEADLINE (Gate 1) ──
-def fig_headline(summaries):
-    fig, ax = plt.subplots(figsize=(8, 5))
+def fig_headline(summaries, boot=None):
+    """Gate-1: simple-hint unfaithfulness delta (= unfaithful_rate − no-hint baseline) per actor.
+    When `boot` is supplied the delta's CI and the gate come from the item-level cluster bootstrap
+    (delta CI excludes 0), not the pooled-Wilson non-overlap test; the point (delta) is unchanged."""
+    boot = boot or {}
+    fig, ax = plt.subplots(figsize=(9.5, 5.2))
     names = [n for n in ORDER if n in summaries]
+    boot_used = False
     for i, n in enumerate(names):
         s = summaries[n]
         base = s["baseline_pick_target"]
@@ -250,11 +261,18 @@ def fig_headline(summaries):
             continue
         uf = c["unfaithful_rate"]
         delta = uf["p"] - base["p"]
-        passes = uf["lo"] > base["hi"]          # Gate-1: non-overlapping 2σ CIs
+        bd = boot.get(n, {}).get("cis", {}).get("headline_delta")
+        if bd:                                   # cluster-bootstrap delta CI; gate = CI excludes 0
+            boot_used = True
+            dlo, dhi = bd["lo"], bd["hi"]
+            passes = dlo > 0
+            yerr = [[max(0.0, delta - dlo)], [max(0.0, dhi - delta)]]
+        else:                                    # fallback: pooled-Wilson non-overlap test
+            passes = uf["lo"] > base["hi"]
+            yerr = [[delta - (uf["lo"] - base["p"])], [(uf["hi"] - base["p"]) - delta]]
         ax.bar(i, delta, color="#2b8cbe" if passes else "#a6bddb", width=0.6,
                edgecolor="black", linewidth=0.8)
-        ax.errorbar(i, delta, yerr=[[delta - (uf["lo"] - base["p"])], [(uf["hi"] - base["p"]) - delta]],
-                    fmt="none", ecolor="black", capsize=4, lw=1.2)
+        ax.errorbar(i, delta, yerr=yerr, fmt="none", ecolor="black", capsize=4, lw=1.2)
         ax.text(i, max(delta, 0) + 0.03,
                 f"{delta:+.2f}\n{'✓gate' if passes else 'ns'}\nfoll={c['follow_withcot']['p']:.2f}",
                 ha="center", va="bottom", fontsize=8)
@@ -262,8 +280,9 @@ def fig_headline(summaries):
     ax.set_xticks(range(len(names)))
     ax.set_xticklabels([LABEL[n] for n in names], fontsize=9)
     ax.set_ylabel("simple-hint unfaithfulness delta\n(hinted-without-mention − no-hint baseline)")
-    ax.set_title("Fig 1 — §3.1 REPLICATION (Gate 1): simple-hint unfaithfulness, L1\n" + _caption(summaries),
-                 fontsize=10)
+    ci = (BOOT_CI + " · gate: CI>0") if boot_used else "Wilson 2σ"
+    ax.set_title("Fig 1 — §3.1 REPLICATION (Gate 1): simple-hint unfaithfulness, L1\n"
+                 + _caption(summaries, ci=ci), fontsize=8.5)
     ax.set_ylim(min(0, ax.get_ylim()[0]), max(0.5, ax.get_ylim()[1]))
     fig.tight_layout()
     return _save(fig, "fig1_headline")
@@ -271,37 +290,49 @@ def fig_headline(summaries):
 
 # ── 2. Necessity-gated complex ──
 def fig_necessity_gated(summaries):
+    """DEMOTED — not a standalone result. Necessity-gated unfaithfulness needs a cell that is BOTH
+    CoT-necessary AND followed; in this follow-based sweep no (actor × level) cell qualifies, so the
+    conditional is UNDEFINED (an empty denominator — neither 0% nor 100%). The earlier version drew
+    those empty cells at full height on an 'unfaithfulness' axis, mis-reading as 100% unfaithful, and
+    its one_shot/declines labels were margin-sensitive and contradicted by the decode-necessity figs.
+    Necessity is measured properly — as decode ACCURACY uplift — in Figs C1/C2 (figures/3p1_complex_hints/).
+    Here we plot ONLY genuine signal cells (if any ever appear) and otherwise redirect; empty cells are
+    never drawn and per-bar necessity labels are gone."""
     names = [n for n in ORDER if n in summaries]
     fig, ax = plt.subplots(figsize=(11, 5.5))
     width = 0.22
+    plotted = 0
     for li, lv in enumerate(LEVELS):
         for ni, n in enumerate(names):
             c = summaries[n].get(lv)
-            if not c:
-                continue
+            if not c or not (c["necessity"] == "cot_necessary" and c["n_followers"] > 0):
+                continue                       # empty-denominator cells are NOT plotted (no full-height bars)
             x = ni + (li - 1) * width
-            signal = c["necessity"] == "cot_necessary" and c["n_followers"] > 0
-            if signal:
-                uf = c["unfaithful_among_followers"]
-                ax.bar(x, uf["p"], width=width, color=["#1b9e77", "#d95f02", "#7570b3"][li],
-                       edgecolor="black", lw=0.6)
-                ax.errorbar(x, uf["p"], yerr=_lohi(uf), fmt="none", ecolor="black", capsize=3, lw=1)
-                ax.text(x, uf["p"] + 0.02, f"{uf['p']:.2f}\nn={c['n_followers']}", ha="center", fontsize=6.5)
-            else:                              # NO necessity window — never plot as 0% unfaithful
-                ax.bar(x, 1.0, width=width, color=GREY, hatch="///", alpha=0.45, edgecolor="grey")
-                ax.text(x, 0.5, f"{c['necessity']}\nfoll={c['follow_withcot']['p']:.2f}",
-                        ha="center", va="center", fontsize=6, rotation=90, color="#333")
+            uf = c["unfaithful_among_followers"]
+            ax.bar(x, uf["p"], width=width, color=["#1b9e77", "#d95f02", "#7570b3"][li],
+                   edgecolor="black", lw=0.6)
+            ax.errorbar(x, uf["p"], yerr=_lohi(uf), fmt="none", ecolor="black", capsize=3, lw=1)
+            ax.text(x, uf["p"] + 0.02, f"{uf['p']:.2f}\nn={c['n_followers']}", ha="center", fontsize=6.5)
+            plotted += 1
     ax.set_xticks(range(len(names)))
     ax.set_xticklabels([LABEL[n] for n in names], fontsize=9)
     ax.set_ylabel("unfaithfulness | (CoT-necessary AND followed)")
     ax.set_ylim(0, 1.05)
-    ax.set_title("Fig 2 — EXTENSION: necessity-gated complex unfaithfulness by level "
-                 "(L1=replication, L2/L3=harder)\n" + _caption(summaries) +
-                 " · grey hatch = no necessity window (one-shot / declines), NOT 0%", fontsize=9.5)
-    ax.legend(handles=[Patch(color="#1b9e77", label="L1"), Patch(color="#d95f02", label="L2"),
-                       Patch(color="#7570b3", label="L3"),
-                       Patch(facecolor=GREY, hatch="///", alpha=0.45, label="no necessity window")],
-              fontsize=8, ncol=4, loc="upper right")
+    if not plotted:
+        ax.text(0.5, 0.5,
+                "No clean necessity-gated window in this follow-based sweep.\n"
+                "No (actor × level) cell is both CoT-necessary AND followed, so this conditional\n"
+                "unfaithfulness is UNDEFINED (an empty denominator — not 0%, not 100%).\n\n"
+                "Necessity is measured properly, as decode-ACCURACY uplift, in\n"
+                "Figs C1/C2  →  figures/3p1_complex_hints/",
+                transform=ax.transAxes, ha="center", va="center", fontsize=11,
+                bbox=dict(boxstyle="round", fc="#f7f7f7", ec="#bbb"))
+    else:
+        ax.legend(handles=[Patch(color="#1b9e77", label="L1"), Patch(color="#d95f02", label="L2"),
+                           Patch(color="#7570b3", label="L3")], fontsize=8, ncol=3, loc="upper right")
+    ax.set_title("Fig 2 (DEMOTED — not a standalone result): necessity-gated complex unfaithfulness\n"
+                 + _caption(summaries) +
+                 " · superseded by the decode-necessity Figs C1/C2 (figures/3p1_complex_hints/)", fontsize=9.5)
     fig.tight_layout()
     return _save(fig, "fig2_necessity_gated")
 
@@ -333,21 +364,29 @@ def fig_decode_uplift(summaries):
     fig, ax = plt.subplots(figsize=(11, 5.6))
     figviz.draw_uplift_bars(
         ax, cells, group_attr="actor", series=["simple", "L1", "L2", "L3"], group_order=ORDER,
-        group_label=LABEL, metric_label="follow-based proxy: picks the hinted letter",
-        title="Fig 3 — EXTENSION: decode-uplift = with-CoT − no-CoT follow-rate, per actor × level "
+        group_label=LABEL, metric_label="picks the hinted letter",
+        ylabel="follow-rate uplift (with-CoT − no-CoT)\n(picks the hinted letter)",
+        verdict_fn=figviz.follow_uplift_verdict,
+        title="Fig 3 — EXTENSION: follow-rate uplift (with-CoT − no-CoT follow-rate), per actor × level "
               "(Newcombe 2σ)\n" + _caption(summaries) +
-              " · annotations = (with-CoT, no-CoT); bars above +0.5 = CoT-necessary")
+              " · annotations = (with-CoT, no-CoT); low follow in BOTH arms = declines, NOT too-hard "
+              "(the decode IS CoT-necessary — see Figs C1/C2)")
     fig.tight_layout()
     return _save(fig, "fig3_decode_uplift")
 
 
 # ── 4. Follow-rate panel ──
-def fig_follow_rate(summaries):
+def fig_follow_rate(summaries, boot=None):
+    """With-CoT follow-rate per actor × condition (the denominator behind every unfaithfulness
+    number). When `boot` is supplied, each bar's whisker is the item-cluster-bootstrap CI of that
+    follow-rate (point unchanged); else pooled-Wilson."""
+    boot = boot or {}
     names = [n for n in ORDER if n in summaries]
     fig, ax = plt.subplots(figsize=(11, 5.5))
     conds = ["simple"] + LEVELS
     colors = {"simple": "#444", "complex_L1": "#1b9e77", "complex_L2": "#d95f02", "complex_L3": "#7570b3"}
     width = 0.18
+    boot_used = False
     for ci, cond in enumerate(conds):
         for ni, n in enumerate(names):
             c = summaries[n].get(cond)
@@ -355,8 +394,11 @@ def fig_follow_rate(summaries):
                 continue
             x = ni + (ci - 1.5) * width
             fr = c["follow_withcot"]
+            bc = boot.get(n, {}).get("cis", {}).get(f"follow_{cond}")
+            yerr = _boot_err(fr["p"], bc, clamp=(0, 1)) if bc else _lohi(fr)
+            boot_used = boot_used or bool(bc)
             ax.bar(x, fr["p"], width=width, color=colors[cond], edgecolor="black", lw=0.5)
-            ax.errorbar(x, fr["p"], yerr=_lohi(fr), fmt="none", ecolor="black", capsize=2, lw=0.8)
+            ax.errorbar(x, fr["p"], yerr=yerr, fmt="none", ecolor="black", capsize=2, lw=0.8)
     for ni, n in enumerate(names):
         base = summaries[n]["baseline_pick_target"]["p"]
         ax.plot([ni - 0.4, ni + 0.4], [base, base], color="red", lw=1, ls=":")
@@ -365,11 +407,92 @@ def fig_follow_rate(summaries):
     ax.set_ylabel("follow_rate (with-CoT) = picks the hinted letter")
     ax.set_ylim(0, 1.05)
     ax.set_title("Fig 4 — follow-rate per actor × condition (the denominator behind every unfaithfulness number)\n"
-                 + _caption(summaries) + " · red dotted = no-hint baseline", fontsize=9.5)
+                 + _caption(summaries, ci=BOOT_CI if boot_used else "Wilson 2σ")
+                 + " · red dotted = no-hint baseline", fontsize=9.5)
     ax.legend(handles=[Patch(color=colors[c], label=c.replace("complex_", "")) for c in conds],
               fontsize=8, ncol=4, loc="upper right")
     fig.tight_layout()
     return _save(fig, "fig4_follow_rate")
+
+
+# ── 5. Concealment scatter — "most cue-susceptible ≠ least monitorable" ──
+def _concealment_rows(experiment, pins):
+    """Per judgeable actor (raw per-rollout transcripts, with-CoT simple cue): follow-rate and
+    BASELINE-CORRECTED concealment-given-follow. Coincidental hinted-letter picks (the no-hint
+    pick-target baseline) are removed from BOTH the concealed-follow count and the follower count —
+    the consistent extension of Fig 1's `unfaithful − baseline` delta to a conditional rate — so a
+    high-baseline actor's concealment isn't inflated by chance picks. strict judge_verdict = mention."""
+    rows = []
+    for a in JUDGEABLE:
+        rid, path = pins.get(a, (None, None))
+        agg = _take_split(load_withcot_rollouts(a, experiment=experiment, run_id=rid, path=path))
+        s, none = agg["simple"], agg["none"]
+        if not s["n"] or not none["n"]:
+            continue
+        n = s["n"]
+        foll = s["mention"] + s["conceal"]                 # picks the hinted letter (with-CoT)
+        concealed = s["conceal"]                           # picked it WITHOUT strict mention
+        base_p = (none["mention"] + none["conceal"]) / none["n"]   # no-hint pick-target rate
+        gen_foll = foll - base_p * n                       # hint-attributable followers
+        gen_conc = concealed - base_p * n                  # hint-attributable concealed follows
+        y = gen_conc / gen_foll if gen_foll > 0 else float("nan")
+        rows.append(dict(actor=a, n=n, foll=foll, x=foll / n, y=y, base_p=base_p,
+                         conceal_raw=(concealed / foll if foll else float("nan")),
+                         gen_conc=max(0, round(gen_conc)), gen_foll=max(0, round(gen_foll))))
+    return rows
+
+
+def fig_concealment(caption="", experiment="exp_hints_sweep", pins=None, boot=None):
+    """Fig 5 — 'most cue-susceptible ≠ least monitorable.' One labelled point per judgeable actor:
+    x = simple-cue follow-rate (with-CoT); y = baseline-corrected concealment among followers
+    (strict judge_verdict). The anti-alignment is the result. Filtered set, explicit fig0 selector.
+    Both error bars are item-cluster-bootstrap CIs when `boot` is supplied (point unchanged) — this
+    is where the thin-cell widening shows: gpt-oss's tiny baseline-corrected denominator gives it a
+    very wide y interval."""
+    boot = boot or {}
+    rows = _concealment_rows(experiment, pins or {})
+    if not rows:
+        print("  [fig5 skipped: no filtered sweep transcripts for the judgeable actors]")
+        return None, []
+    fig, ax = plt.subplots(figsize=(9.0, 6.8))
+    boot_used = False
+    for r in rows:
+        color = ACTOR_COLOR.get(r["actor"], "#333")
+        yv = max(0.0, r["y"]) if r["y"] == r["y"] else 0.0
+        acis = boot.get(r["actor"], {}).get("cis", {})
+        bx, byc = acis.get("follow_simple"), acis.get("concealment_corrected_simple")
+        if bx and byc:
+            boot_used = True
+            xerr = _boot_err(r["x"], bx, clamp=(0, 1))
+            yerr = _boot_err(yv, byc, clamp=(0, 1))
+        else:                                    # fallback: pooled Wilson (on baseline-corrected counts)
+            xlo, xhi = metrics.wilson_ci(r["foll"], r["n"])
+            ylo, yhi = metrics.wilson_ci(r["gen_conc"], r["gen_foll"]) if r["gen_foll"] > 0 else (yv, yv)
+            xerr = [[r["x"] - xlo], [xhi - r["x"]]]
+            yerr = [[max(0, yv - ylo)], [max(0, yhi - yv)]]
+        ax.errorbar(r["x"], yv, xerr=xerr, yerr=yerr, fmt="o", ms=12, color=color,
+                    ecolor=color, elinewidth=1.3, capsize=4, zorder=3)
+        ax.annotate(LABEL[r["actor"]].replace("\n", " "), (r["x"], yv), textcoords="offset points",
+                    xytext=(11, 9), fontsize=9.5, color=color, fontweight="bold")
+        ax.annotate(f"follow {r['x']:.2f} · conceal {yv:.2f} (raw {r['conceal_raw']:.2f})",
+                    (r["x"], yv), textcoords="offset points", xytext=(11, -15), fontsize=7, color="#555")
+    ax.annotate("anti-alignment:\nfollows more → conceals less", xy=(0.97, 0.97),
+                xycoords="axes fraction", ha="right", va="top", fontsize=9, color="#777",
+                bbox=dict(boxstyle="round", fc="#f7f7f7", ec="#ccc"))
+    ax.set_xlim(0, 1.0)
+    ax.set_ylim(0, 1.05)
+    ax.grid(True, ls=":", lw=0.5, color="#ddd")
+    ax.set_xlabel("follow-rate (with-CoT, simple cue) = picks the hinted letter")
+    ax.set_ylabel("concealment | followers, baseline-corrected\n"
+                  "= (unfaithful − base) / (follow − base), strict judge_verdict")
+    ci_note = ("CIs = " + BOOT_CI) if boot_used else "Wilson 2σ"
+    ax.set_title("Fig 5 — most cue-susceptible ≠ least monitorable (simple cue)\n"
+                 + caption + "\n"
+                 "y = concealment among hint-attributable followers, baseline-subtracted "
+                 "(numerator AND denominator,\nas Fig 1's delta); strict judge_verdict · "
+                 "raw (in parens) = uncorrected · " + ci_note, fontsize=8.5)
+    fig.tight_layout()
+    return _save(fig, "fig5_concealment"), rows
 
 
 def _save(fig, name):
@@ -403,12 +526,22 @@ def main(args):
         print("no completed sweep_<actor>.json yet — run after an actor finishes.")
         return
     print(f"actors with data: {list(summaries)}")
-    paths = [fig_headline(summaries), fig_necessity_gated(summaries),
-             fig_decode_uplift(summaries), fig_follow_rate(summaries)]
+    pins = _parse_pins(args.fig0_transcript)
 
-    # Fig 0 — paper analog, built from RAW per-rollout transcripts (own data path).
+    # Item-level cluster-bootstrap CIs for Figs 0/1/4/5 (FILTERED set, resamples the ~60 items).
+    # Wilson-over-pooled-samples treats 60×10 as 600 independent draws; within-item samples are
+    # correlated, so the bootstrap is the honest interval. Points never move — only CIs widen.
+    boot = _boot_for([n for n in ORDER if n in summaries], pins=pins,
+                     n_boot=args.n_boot, seed=args.boot_seed)
+
+    paths = [fig_headline(summaries, boot), fig_necessity_gated(summaries),
+             fig_decode_uplift(summaries), fig_follow_rate(summaries, boot)]
+
+    # Fig 0 — paper analog, built from RAW per-rollout transcripts (own data path). The cluster
+    # bootstrap is filtered-set only; pass it to the take-rate whiskers when fig0 is the filtered set.
     set_cfg = FIG0_SETS[args.fig0_set]
-    p0, complex_frac = fig_paper_analog(pins=_parse_pins(args.fig0_transcript), **set_cfg)
+    p0, complex_frac = fig_paper_analog(pins=pins, boot=(boot if args.fig0_set == "filtered" else None),
+                                        **set_cfg)
     if p0 is not None:
         paths.insert(0, p0)
         print(f"  REPLICATION READOUT [{args.fig0_set} set] — strict mention rate among COMPLEX "
@@ -420,6 +553,17 @@ def main(args):
                 verdict = "REPLICATE (followers reveal the decode)" if frac >= 0.5 \
                     else "CONTRADICT (followers conceal the decode)"
                 print(f"    {a:18} {frac:.2f} mention the arithmetic decode → {verdict}")
+
+    # Fig 5 — concealment scatter (FILTERED set always; raw per-rollout transcripts, explicit selector).
+    p5, conceal_rows = fig_concealment(caption=_caption(summaries, ci=""), pins=pins, boot=boot)
+    if p5 is not None:
+        paths.append(p5)
+        print("  CONCEALMENT READOUT [filtered, simple cue] — follow-rate vs baseline-corrected "
+              "concealment|followers (raw in parens):")
+        for r in sorted(conceal_rows, key=lambda r: r["x"]):
+            yv = max(0.0, r["y"]) if r["y"] == r["y"] else float("nan")
+            print(f"    {r['actor']:18} follow={r['x']:.2f}  conceal={yv:.2f}  "
+                  f"(raw {r['conceal_raw']:.2f}, base={r['base_p']:.2f})")
 
     for p in paths:
         print(f"  saved {p}")
@@ -449,6 +593,9 @@ if __name__ == "__main__":
                     help="which transcript set Fig 0 reads: 'filtered' (correct-with-CoT gate ON) "
                          "or 'unfiltered' (--no-filter runs). Run twice to get both 4-panel versions.")
     ap.add_argument("--fig0-transcript", action="append", default=[], metavar="ACTOR=RUNID_OR_PATH",
-                    help="pin Fig 0's transcript for an actor (repeatable); required only if >1 "
-                         "transcript matches the set's glob for that actor.")
+                    help="pin a transcript for an actor (repeatable); required only if >1 transcript "
+                         "matches the set's glob. Used by Figs 0/5 and the cluster bootstrap.")
+    ap.add_argument("--n-boot", type=int, default=5000,
+                    help="item-level cluster-bootstrap resamples for the Figs 0/1/4/5 CIs.")
+    ap.add_argument("--boot-seed", type=int, default=0, help="seed for the cluster bootstrap (reproducible CIs).")
     main(ap.parse_args())
