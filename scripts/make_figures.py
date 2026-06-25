@@ -431,6 +431,68 @@ def fig_necessity_gated(summaries):
     return _save(fig, "fig2_necessity_gated")
 
 
+# ── 2b. Necessity-SCOPED complex unfaithfulness (companion to Fig 2; do NOT fold into fig2) ──
+def _decode_verdicts(actor, *, family=COMPLEX_FAMILY):
+    """({level:int -> decode-necessity verdict} for `family`, available?) from
+    logs/decode_necessity_<actor>.json. available=False if no decode file yet (pending msg-7a run)."""
+    p = Path(f"logs/decode_necessity_{actor}.json")
+    if not p.exists():
+        return {}, False
+    d = json.loads(p.read_text())
+    return ({r["level"]: r["necessity"] for r in d.get("rows", []) if r.get("family") == family}, True)
+
+
+def fig_necessity_gated_scoped(summaries):
+    """Fig 2b — necessity-scoped companion to Fig 2 (Fig 2 left exactly as-is). Same metric (complex
+    unfaithfulness | followed) but the necessity GATE is the **decode-necessity verdict** (C1/C2) per
+    actor×level — NOT Fig 2's follow-based point+0.05-margin label. A cell is a valid complex datapoint
+    ONLY if the decode is CoT-necessary for that actor at that level (one-shot/too-hard excluded). Unlike
+    Fig 2 — whose follow-based label is never `cot_necessary` here, so it plots nothing — this DOES plot:
+    arithmetic is CoT-necessary at every level for gemini-3-flash/gpt-5.5, so their floored-but-nonzero
+    complex followers are valid datapoints. gemini-2.5-flash/gpt-oss show 'decode pending' until msg 7a."""
+    names = [n for n in ORDER if n in summaries]
+    fig, ax = plt.subplots(figsize=(11, 5.5))
+    width = 0.22
+    colors = ["#1b9e77", "#d95f02", "#7570b3"]
+    plotted = 0
+    for ni, n in enumerate(names):
+        verdicts, avail = _decode_verdicts(n)
+        if not avail:                          # no decode data → can't gate by necessity yet
+            ax.text(ni, 0.5, "decode\npending\n(msg 7a)", ha="center", va="center", fontsize=7,
+                    color="#999", style="italic")
+            continue
+        for li, lv in enumerate(LEVELS):
+            c = summaries[n].get(lv)
+            x = ni + (li - 1) * width
+            verdict = verdicts.get(li + 1)
+            if verdict == "cot_necessary" and c and c["n_followers"] > 0:
+                uf = c["unfaithful_among_followers"]
+                ax.bar(x, uf["p"], width=width, color=colors[li], edgecolor="black", lw=0.6)
+                ax.errorbar(x, uf["p"], yerr=_lohi(uf), fmt="none", ecolor="black", capsize=3, lw=1)
+                ax.text(x, uf["p"] + 0.02, f"{uf['p']:.2f}\nn={c['n_followers']}", ha="center", fontsize=6.5)
+                plotted += 1
+            else:                              # excluded — small reason marker, NEVER a full-height bar
+                reason = ("no followers" if verdict == "cot_necessary"
+                          else (verdict or "—").replace("_", "-"))
+                ax.text(x, 0.02, reason, ha="center", va="bottom", fontsize=6, rotation=90, color="#aaa")
+    ax.set_xticks(range(len(names)))
+    ax.set_xticklabels([LABEL[nm] for nm in names], fontsize=9)
+    ax.set_ylabel("unfaithfulness | (decode CoT-necessary AND followed)")
+    ax.set_ylim(0, 1.05)
+    if not plotted:
+        ax.text(0.5, 0.5, "no necessity-validated complex cell with followers yet\n"
+                "(run the decode sweep for all actors — msg 7a)", transform=ax.transAxes,
+                ha="center", va="center", fontsize=11, bbox=dict(boxstyle="round", fc="#f7f7f7", ec="#bbb"))
+    ax.legend(handles=[Patch(color=colors[i], label=f"L{i + 1}") for i in range(3)],
+              fontsize=8, ncol=3, loc="upper right")
+    ax.set_title("Fig 2b — necessity-SCOPED complex unfaithfulness (gate = decode-necessity verdict C1/C2, "
+                 "per actor×level)\n" + _caption(summaries) +
+                 " · valid cell = decode CoT-necessary (one-shot/too-hard excluded) · companion to Fig 2",
+                 fontsize=9)
+    fig.tight_layout()
+    return _save(fig, "fig2b_necessity_scoped")
+
+
 # ── 3. Decode-uplift bars (Part B fix — replaces the crushed two-line curve) ──
 def _repl_cells(summaries):
     """Replication decode cells. Here the decode-accuracy PROXY is the follow-rate (picks the hinted
@@ -629,6 +691,7 @@ def main(args):
                      n_boot=args.n_boot, seed=args.boot_seed)
 
     paths = [fig_headline(summaries, boot), fig_necessity_gated(summaries),
+             fig_necessity_gated_scoped(summaries),
              fig_decode_uplift(summaries), fig_follow_rate(summaries, boot)]
 
     # Fig 0 — paper analog, built from RAW per-rollout transcripts (own data path). The cluster
