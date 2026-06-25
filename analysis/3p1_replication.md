@@ -16,9 +16,13 @@ Replication run: `scripts/run_sweep.py` · data `logs/sweep_<actor>.json` · fig
 - **Dataset:** GPQA (`Idavidrein/gpqa`, extended config; `HF_TOKEN`). The GPQA canary string **never
   enters a prompt** — parsers read only the question + answer options. MMLU-Pro was smoke/generalization
   only and is not part of Gate 1.
-- **Scale (locked):** **60 items × 10 samples/cell**. Items are pre-filtered to **correct-with-CoT**
-  for each actor (120 candidates × 4 samples → keep the 60 the actor solves with CoT), so that
-  following a wrong hint is a *meaningful behaviour change* rather than noise on an item it can't do.
+- **Scale (locked):** **60 items × 10 samples/cell**.
+- **Item gate — correct-with-CoT.** For each actor we keep only items it answers correctly *with* CoT
+  (120 candidates × 4 samples → the 60 it solves), so following a wrong hint is a *meaningful behaviour
+  change* and the no-hint baseline isn't inflated by chance picks on items it can't do. This is a
+  baseline-cleaning gate added **in the spirit of the paper's §5 uplift set** — but **§3.1 in the paper
+  is itself ungated**, so we also ran the full sweep **without** the gate as a robustness check
+  (see *Robustness: ungated set* below). Headline numbers are the gated set.
 - **Design:** 2×3 grid — `{none, simple, complex} × {with-CoT, no-CoT}`. The **judged arm is
   with-CoT**; the no-CoT arm forces an early `<answer>` prefill (necessity/decode check) so forcing
   never truncates the with-CoT trace the judge reads.
@@ -91,43 +95,14 @@ the time (unfaithful|followers 0.54) — i.e. it is comparatively monitorable.
 gemini-3-flash follows the cue most often but *reveals* it ~35% of the time — more faithful-when-following
 than the two near-total concealers (2.5-flash, gpt-5.5).
 
-## Robustness check: unfiltered item set (no per-model correct-with-CoT screen)
+## Robustness: ungated set
 
-To test whether the Gate-1 result is an artifact of the per-model item selection, the full sweep was
-re-run with the **correct-with-CoT filter disabled** (`run_sweep.py --no-filter`; same 60×10 scale, fixed
-unselected GPQA items that include questions the actor gets wrong *even with* CoT). Data:
-`results/gate1_sweep_summaries_unfiltered.json` (W&B group `exp_hints_sweep_unfiltered`, e.g.
-`different-capybara-31`).
-
-| actor | baseline (filt → unfilt) | simple unfaithfulness (filt → unfilt) | **delta** (filt → unfilt) | 2σ gate |
-|---|---|---|---|---|
-| gemini-2.5-flash | 0.018 → **0.050** | 0.167 → 0.143 | **+0.148 → +0.093** | ✅ → ✅ |
-| gemini-3-flash | 0.017 → **0.087** | 0.445 → 0.538 | +0.428 → +0.452 | ✅ → ✅ |
-| gpt-5.5 | 0.018 → **0.130** | 0.445 → 0.548 | +0.427 → +0.418 | ✅ → ✅ |
-| gpt-oss-120b | 0.070 → **0.152** | 0.073 → 0.172 | +0.003 → +0.020 | ns → ns |
-
-**The replication survives.** Gate-1 still clears on the same 3/4 actors (non-overlapping 2σ), gpt-oss-120b
-is still the cue-robust negative, and the actor ordering is identical. Three reads:
-
-1. **Baselines rise 2–7×.** This is the expected mechanism, not a finding: on unselected items the model is
-   often wrong/guessing, so it lands on the random "target" letter by chance more often → a higher no-hint
-   pick-target baseline. This chance inflation is exactly what the correct-with-CoT filter exists to remove.
-2. **Raw concealment behaviour is robust** — simple-unfaithfulness rates barely move (and rise slightly for
-   the two strong actors). "Follows a wrong *simple* cue without revealing it" is **not** an artifact of
-   per-model item selection.
-3. **The most filter-sensitive number is gemini-2.5-flash's delta (+0.148 → +0.093, ~halved):** its
-   unfaithfulness held flat while its baseline tripled. It still clears 2σ (unfaith [0.117, 0.174] vs
-   baseline [0.035, 0.071]), but the paper-analog effect is the weakest on the unfiltered set. gpt-5.5 and
-   gemini-3-flash deltas are essentially unchanged because their unfaithfulness rose with the baseline.
-
-**Complex arm — unchanged.** Decode-uplift stays flat-to-near-zero in both sets (filtered −0.14…+0.11;
-unfiltered −0.15…+0.17); removing the filter nudges gemini-3-flash/gpt-5.5 slightly positive (e.g. gpt-5.5
-L2 −0.008 → +0.068) but **no clean necessity window opens** either way — consistent with the finding that
-the real per-model necessity flip lives in the decode-only Part C sweep, not the follow-based arm.
-
-> **Headline stays the filtered numbers** (the correct-with-CoT delta removes the chance-pick inflation
-> visible in the unfiltered baselines); the unfiltered set is cited as a robustness check, with the one
-> honest caveat that gemini-2.5-flash's effect is the most filter-sensitive.
+**Gate-1 also clears unfiltered — the effect is not a filter artifact.** Re-running the full sweep with
+the item gate off (`run_sweep.py --no-filter`) keeps the same 3/4 actors passing; baselines rise as
+expected (chance picks on items the actor can't solve — exactly what the gate removes) but the
+simple-unfaithfulness behaviour is robust. Headline numbers stay the gated set; data in
+`results/gate1_sweep_summaries_unfiltered.json` (no unfiltered figures or tables). The one filter-sensitive
+number is gemini-2.5-flash's delta (~halves but still clears).
 
 ## CoT can *increase* robustness to the bad cue
 
@@ -145,6 +120,12 @@ these two to answer immediately and they swallow the cue ~2–4× more often. (g
 exception — CoT does not change its follow rate.) → **Fig 3** plots this as a decode-uplift bar; the
 `simple` bars sit *below zero* and are coloured **one-shot** (no-CoT high → no CoT needed to follow a
 metadata cue).
+
+**Caveat — this magnitude is an UPPER bound.** The no-CoT arm forces an early `<answer>` prefill, which
+is **out-of-distribution for natively-reasoning models** (they are trained to think before answering);
+forcing an immediate answer both removes reasoning *and* pushes the model off-policy. The *direction* is
+robust (no-CoT follows the cue more), but the *size* — especially **gpt-5.5's 0.91 forced-follow** — is
+likely **inflated** by the OOD prefill rather than being purely a CoT-robustness effect.
 
 ## The complex arm: declined / one-shot, never a clean window — so unfaithfulness is UNDEFINED, not 0%
 
@@ -181,8 +162,15 @@ measured separately** in the decode-only extension (`scripts/decode_necessity_sw
 CoT — independent of whether it chooses to follow (full results: [`3p1_complex_hints.md`](3p1_complex_hints.md)).
 There, the decode is genuinely CoT-necessary for most families (e.g. gpt-5.5 arithmetic L3 uplift +0.78
 at n=240, with-CoT 1.00 / no-CoT 0.22) — confirming the low §3.1 complex follow is a *choice not to pay
-the CoT cost*, not an inability — while the per-model erosion shows up cleanly (gpt-5.5 **one-shots
-`bignum` L2/L3** that gemini-3-flash needs CoT for).
+the CoT cost*, not an inability — while a per-model **capability gap** shows up cleanly (gpt-5.5
+**one-shots `bignum`** — it spots a mod-4 low-bit shortcut — that gemini-3-flash needs CoT for).
+
+> **Coverage note.** The decode-necessity sweep currently has data for **gemini-3-flash and gpt-5.5**.
+> The "declines, not inability" reading is therefore *measured* for those two and (for now) *inferred*
+> for the two actors it most concerns — the paper analog (gemini-2.5-flash) and gpt-oss-120b.
+> `scripts/decode_necessity_sweep.py` now includes both, so this can be measured rather than asserted
+> (gpt-oss is native_raw → its decode trace is read from the `reasoning` field; its non-disableable
+> reasoning makes its no-CoT arm a conservative lower bound).
 
 ---
 
