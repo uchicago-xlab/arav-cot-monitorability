@@ -42,7 +42,10 @@ from cot_mon.logging import wandb_logger as wl  # noqa: E402
 from cot_mon.models import roster  # noqa: E402
 from cot_mon.monitors import uplift_filter as uf  # noqa: E402
 
-ACTORS = ["gemini_3_flash", "gpt_5_5"]
+# gemini-2.5-flash + gpt-oss-120b added so the "declines, not inability" claim is MEASURED for the
+# §3.1 actors it's about (paper analog + open-weight), not just asserted. gpt-oss is native_raw → its
+# decode trace is in the `reasoning` field (handled via cot_source, mirroring run_sweep).
+ACTORS = ["gemini_3_flash", "gpt_5_5", "gemini_2_5_flash", "gpt_oss_120b"]
 FAMILIES = ["arithmetic", "bignum", "iterated", "deductive", "indirection"]
 LEVELS = [1, 2, 3]
 CALIBRATE_CACHE = Path("logs/calibrate_complex_last.json")
@@ -99,15 +102,21 @@ def _row(family, level, k_cot, n_cot, k_nocot, n_nocot, source):
 
 async def run_actor(name, args, reuse):
     entry = roster.get_entry(name)
-    if roster.judged_cot_source(entry.cot_access) != "body":
-        print(f"  WARNING {name}: cot_source={roster.judged_cot_source(entry.cot_access)} — the decode "
-              f"sampler reads .completion (body); native_raw traces live in the reasoning field.")
-    model = roster.build_model(name, config=GenerateConfig(temperature=args.temperature, max_tokens=args.max_tokens))
-    print(f"\n=== {name} ({entry.cot_access}) ===", flush=True)
+    cot_source = roster.judged_cot_source(entry.cot_access)
+    # Mirror run_sweep's channel-aware handling: native_raw actors (gpt-oss) keep the CoT in the
+    # `reasoning` field, so bump max_tokens (the trace must not crowd out the answer) and tell the
+    # sampler to read the letter from / capture that field. NB: their reasoning channel is not
+    # disableable, so the forced-no-CoT arm may not fully suppress it → uplift is a LOWER bound.
+    max_tokens = max(args.max_tokens, 8000) if cot_source == "reasoning" else args.max_tokens
+    model = roster.build_model(name, config=GenerateConfig(temperature=args.temperature, max_tokens=max_tokens))
+    print(f"\n=== {name} ({entry.cot_access}, cot_source={cot_source}, max_tokens={max_tokens}) ===", flush=True)
+    if cot_source == "reasoning":
+        print(f"  NOTE {name}: native_raw — forced-no-CoT may not suppress the non-disableable reasoning "
+              f"channel; treat uplift as a conservative lower bound.")
     print(f"  {'cell':18} {'with-CoT':>9} {'no-CoT':>8} {'uplift':>8} {'2σ CI':>16}  verdict   src")
 
     rows, captures, stats = [], [], {"in_tok": 0, "out_tok": 0, "n_gen": 0}
-    sampler = decode.make_sampler(model, capture=captures, stats=stats)
+    sampler = decode.make_sampler(model, capture=captures, stats=stats, cot_source=cot_source)
     t0 = time.monotonic()
     for family in args.families:
         for level in args.levels:
@@ -133,9 +142,9 @@ async def run_actor(name, args, reuse):
                   f"{row['uplift']:>+8.2f} {ci:>16}  {row['necessity']:13} {row['source']}", flush=True)
     wall = time.monotonic() - t0
     n_fresh = sum(1 for r in rows if r["source"] == "fresh")
-    meta = {"actor": name, "cot_access": entry.cot_access, "max_tokens": args.max_tokens,
-            "count": args.count, "n_samples": args.n_samples, "n_fresh_cells": n_fresh,
-            "n_reused_cells": len(rows) - n_fresh, "wall_s": wall, **stats}
+    meta = {"actor": name, "cot_access": entry.cot_access, "cot_source": cot_source,
+            "max_tokens": max_tokens, "count": args.count, "n_samples": args.n_samples,
+            "n_fresh_cells": n_fresh, "n_reused_cells": len(rows) - n_fresh, "wall_s": wall, **stats}
 
     if not args.no_wandb and captures:
         try:

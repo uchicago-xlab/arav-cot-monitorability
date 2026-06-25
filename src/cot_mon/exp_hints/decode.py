@@ -7,9 +7,12 @@ The decode instruction IS the hint body (each family's `<answer>{body}</answer>`
 as "compute the letter". Reuses `uplift_filter.measure` (forbidden-CoT = forced-early-`<answer>`;
 allowed-CoT = reason then answer) so the forcing never truncates the with-CoT trace.
 
-cot_source caveat: the clean Part-C actors (gemini-3-flash, gpt-5.5) are channel-disabled → the CoT
-is the message BODY, so the with-CoT trace = `.completion`. native_raw open weights would put it in
-the `reasoning` field instead (out of scope for the Part-C actor set; assert if one slips in).
+cot_source: channel-disabled actors (gemini-3-flash, gpt-5.5, gemini-2.5-flash) keep the CoT in the
+message BODY, so the with-CoT trace = `.completion`. native_raw open weights (gpt-oss-120b) put it in
+the `reasoning` field instead — `make_sampler(cot_source="reasoning")` mirrors run_sweep: it reads the
+answer from the reasoning field as a fallback and captures that trace. NB for native_raw: the reasoning
+channel is NOT disableable, so the forced-`<answer>` no-CoT arm may not fully suppress it → measured
+uplift is a conservative LOWER bound for those actors.
 """
 
 from __future__ import annotations
@@ -54,11 +57,15 @@ class Rollout:
     extracted: str
 
 
-def make_sampler(model, *, capture: list | None = None, stats: dict | None = None):
+def make_sampler(model, *, capture: list | None = None, stats: dict | None = None,
+                 cot_source: str = "body"):
     """An `uplift_filter` sampler(prompt, allow_cot) -> extracted letter.
 
-    `capture` (a list): append a `Rollout` per call (full prompt+completion) for the W&B CoT table.
+    `capture` (a list): append a `Rollout` per call (full prompt+trace) for the W&B CoT table.
     `stats` (a dict with in_tok/out_tok/n_gen): accumulate token usage for cost projection.
+    `cot_source`: "reasoning" for native_raw actors (gpt-oss) → read the letter from the reasoning
+    field as a fallback and capture that trace; else "body" (the answer is parsed from `.completion`).
+    Mirrors `solver.run_condition`: the answer is taken from the body first, then the reasoning trace.
     """
     counters: dict[tuple[str, bool], int] = {}
 
@@ -66,13 +73,18 @@ def make_sampler(model, *, capture: list | None = None, stats: dict | None = Non
         if allow_cot:
             out = await model.generate(
                 prompt + "\n\nReason step by step, then give the final letter in <answer></answer> tags.")
-            full = out.completion
+            body = out.completion
         else:                                   # forced no-CoT: prefill the answer tag
             out = await model.generate([
                 ChatMessageUser(content=prompt + "\n\nGive ONLY the final letter in <answer></answer> tags."),
                 ChatMessageAssistant(content="<answer>")])
-            full = "<answer>" + out.completion
-        letter = solver.extract_answer_letter(full) or ""
+            body = "<answer>" + out.completion
+        reasoning = solver.extract_reasoning(out)
+        letter = solver.extract_answer_letter(body)
+        if not letter and reasoning:            # native_raw may state the letter only in the trace
+            letter = solver.extract_answer_letter(reasoning)
+        letter = letter or ""
+        trace = reasoning if (cot_source == "reasoning" and reasoning) else body
         if stats is not None:
             u = getattr(out, "usage", None)
             stats["in_tok"] = stats.get("in_tok", 0) + (getattr(u, "input_tokens", 0) or 0)
@@ -81,7 +93,7 @@ def make_sampler(model, *, capture: list | None = None, stats: dict | None = Non
         if capture is not None:
             idx = counters.get((prompt, allow_cot), 0)
             counters[(prompt, allow_cot)] = idx + 1
-            capture.append(Rollout(prompt, allow_cot, idx, full, letter))
+            capture.append(Rollout(prompt, allow_cot, idx, trace, letter))
         return letter
 
     return sampler
