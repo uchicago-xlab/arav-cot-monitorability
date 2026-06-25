@@ -76,16 +76,16 @@ async def run_actor(name, args):
         kept, rates = await solver.correct_with_cot(model, items, n_samples=args.filter_samples,
                                                     threshold=args.min_correct, concurrency=args.concurrency)
         kept = kept[:args.n_items]
-    print(f"  filter: kept {len(kept)}/{len(items)} (correct-with-CoT >= {args.min_correct})", flush=True)
+    print(f"  [{name}] filter: kept {len(kept)}/{len(items)} (correct-with-CoT >= {args.min_correct})", flush=True)
     if not kept:
-        print("  no items survived the filter."); return None, None
+        print(f"  [{name}] no items survived the filter."); return None, None
 
     records = []
     for i, it in enumerate(kept):
         records += await solver.run_sweep(model, it, n_samples=args.n_samples, levels=levels,
                                           seed=args.seed, cot_source=cot_source, concurrency=args.concurrency)
         if (i + 1) % 10 == 0:
-            print(f"  ... {i + 1}/{len(kept)} items swept", flush=True)
+            print(f"  [{name}] ... {i + 1}/{len(kept)} items swept", flush=True)
     wall = time.monotonic() - t0
 
     summary = metrics.sweep_summary(records)
@@ -123,11 +123,11 @@ async def run_actor(name, args):
 
 def _print_actor(name, s, meta):
     b = s["baseline_pick_target"]
-    print(f"  baseline pick-target = {b['p']:.2f} [{b['lo']:.2f},{b['hi']:.2f}]  (items={s['n_items']})")
+    print(f"  [{name}] baseline pick-target = {b['p']:.2f} [{b['lo']:.2f},{b['hi']:.2f}]  (items={s['n_items']})")
     for kind in sorted(k for k in s if k.startswith(("simple", "complex"))):
         c = s[kind]
         uf = c["unfaithful_rate"]
-        line = (f"    {kind:11} follow(wCoT)={c['follow_withcot']['p']:.2f} follow(noCoT)={c['follow_nocot']['p']:.2f}"
+        line = (f"    [{name}] {kind:11} follow(wCoT)={c['follow_withcot']['p']:.2f} follow(noCoT)={c['follow_nocot']['p']:.2f}"
                 f"  unfaithful={uf['p']:.2f}[{uf['lo']:.2f},{uf['hi']:.2f}]  necessity={c['necessity']}"
                 f"  (followers={c['n_followers']})")
         print(line)
@@ -164,13 +164,19 @@ async def main(args):
     if args.dry:
         args.n_items, args.n_samples, args.no_filter, args.no_wandb = 2, 1, True, True
     metas, summaries = {}, {}
-    for name in args.models:
+
+    async def _one(name):
         try:
             s, m = await run_actor(name, args)
             summaries[name], metas[name] = s, m
         except Exception as e:  # noqa: BLE001
-            print(f"  {name} FAILED: {e}")
+            print(f"  [{name}] FAILED: {e}", flush=True)
             metas[name] = None
+
+    # Actors run concurrently: each keeps its OWN --concurrency pool, so in-flight calls =
+    # len(models) x concurrency, and wall-time = slowest actor instead of the sum. Each actor's
+    # W&B init/log/finish block is await-free, so asyncio serialises those (no run clobbering).
+    await asyncio.gather(*(_one(name) for name in args.models))
     tag = "_unfiltered" if args.no_filter else ""
     if not args.dry:
         Path(f"logs/sweep_all{tag}.json").write_text(json.dumps(

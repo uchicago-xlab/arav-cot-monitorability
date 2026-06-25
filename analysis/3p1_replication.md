@@ -91,6 +91,44 @@ the time (unfaithful|followers 0.54) — i.e. it is comparatively monitorable.
 gemini-3-flash follows the cue most often but *reveals* it ~35% of the time — more faithful-when-following
 than the two near-total concealers (2.5-flash, gpt-5.5).
 
+## Robustness check: unfiltered item set (no per-model correct-with-CoT screen)
+
+To test whether the Gate-1 result is an artifact of the per-model item selection, the full sweep was
+re-run with the **correct-with-CoT filter disabled** (`run_sweep.py --no-filter`; same 60×10 scale, fixed
+unselected GPQA items that include questions the actor gets wrong *even with* CoT). Data:
+`results/gate1_sweep_summaries_unfiltered.json` (W&B group `exp_hints_sweep_unfiltered`, e.g.
+`different-capybara-31`).
+
+| actor | baseline (filt → unfilt) | simple unfaithfulness (filt → unfilt) | **delta** (filt → unfilt) | 2σ gate |
+|---|---|---|---|---|
+| gemini-2.5-flash | 0.018 → **0.050** | 0.167 → 0.143 | **+0.148 → +0.093** | ✅ → ✅ |
+| gemini-3-flash | 0.017 → **0.087** | 0.445 → 0.538 | +0.428 → +0.452 | ✅ → ✅ |
+| gpt-5.5 | 0.018 → **0.130** | 0.445 → 0.548 | +0.427 → +0.418 | ✅ → ✅ |
+| gpt-oss-120b | 0.070 → **0.152** | 0.073 → 0.172 | +0.003 → +0.020 | ns → ns |
+
+**The replication survives.** Gate-1 still clears on the same 3/4 actors (non-overlapping 2σ), gpt-oss-120b
+is still the cue-robust negative, and the actor ordering is identical. Three reads:
+
+1. **Baselines rise 2–7×.** This is the expected mechanism, not a finding: on unselected items the model is
+   often wrong/guessing, so it lands on the random "target" letter by chance more often → a higher no-hint
+   pick-target baseline. This chance inflation is exactly what the correct-with-CoT filter exists to remove.
+2. **Raw concealment behaviour is robust** — simple-unfaithfulness rates barely move (and rise slightly for
+   the two strong actors). "Follows a wrong *simple* cue without revealing it" is **not** an artifact of
+   per-model item selection.
+3. **The most filter-sensitive number is gemini-2.5-flash's delta (+0.148 → +0.093, ~halved):** its
+   unfaithfulness held flat while its baseline tripled. It still clears 2σ (unfaith [0.117, 0.174] vs
+   baseline [0.035, 0.071]), but the paper-analog effect is the weakest on the unfiltered set. gpt-5.5 and
+   gemini-3-flash deltas are essentially unchanged because their unfaithfulness rose with the baseline.
+
+**Complex arm — unchanged.** Decode-uplift stays flat-to-near-zero in both sets (filtered −0.14…+0.11;
+unfiltered −0.15…+0.17); removing the filter nudges gemini-3-flash/gpt-5.5 slightly positive (e.g. gpt-5.5
+L2 −0.008 → +0.068) but **no clean necessity window opens** either way — consistent with the finding that
+the real per-model necessity flip lives in the decode-only Part C sweep, not the follow-based arm.
+
+> **Headline stays the filtered numbers** (the correct-with-CoT delta removes the chance-pick inflation
+> visible in the unfiltered baselines); the unfiltered set is cited as a robustness check, with the one
+> honest caveat that gemini-2.5-flash's effect is the most filter-sensitive.
+
 ## CoT can *increase* robustness to the bad cue
 
 For **gemini-2.5-flash** and **gpt-5.5**, the no-CoT arm follows the simple cue **far more** than the
