@@ -17,17 +17,31 @@ runners drive an Inspect model (set temperature in the model's GenerateConfig fo
 from __future__ import annotations
 
 import asyncio
+import json
 import random
 import re
 from dataclasses import dataclass
 
-from inspect_ai.model import ChatMessageAssistant, ChatMessageUser, ContentReasoning
+from inspect_ai.model import (ChatMessageAssistant, ChatMessageUser, ContentReasoning,
+                              GenerateConfig, ResponseSchema)
+from inspect_ai.util import JSONSchema
 
 from cot_mon.exp_hints.data import MCQItem, _seed_from, index_to_letter, letter_to_index
 from cot_mon.exp_hints.hints import make_complex_hint, make_simple_hint
 from cot_mon.monitors.hint_judge import judge_complex, judge_simple
 
 HINT_KINDS = ("none", "simple", "complex")
+
+# no-CoT (necessity) forcing mechanisms — per-actor (roster `no_cot_mechanism`):
+#   "prefill"            prefill the assistant turn with `<answer>` so it commits immediately
+#                        (the default; every OpenRouter actor).
+#   "structured_output"  for actors that REJECT assistant prefill (Anthropic Opus 4.8 / the 4.6+
+#                        family → 400): constrain the output to a single-letter enum schema so there
+#                        is no room to externalise reasoning. Enforced server-side, not by instruction.
+#                        NB: a DIFFERENT mechanism than prefill → its uplift carries a comparability
+#                        footnote vs the prefill actors (SPEC necessity is mechanism-sensitive).
+NO_COT_PREFILL = "prefill"
+NO_COT_STRUCTURED = "structured_output"
 
 
 async def _bounded_gather(coros, limit: int):
@@ -138,24 +152,57 @@ class GridRecord:
         return bool(self.judge_evidence)
 
 
+# ── structured-output no-CoT (for actors that reject assistant prefill) ──
+def _letter_schema(item: MCQItem) -> ResponseSchema:
+    """A single-letter enum schema ({"answer": one of the item's letters}) — the forced-no-CoT arm
+    for prefill-rejecting actors. The model can only emit the answer; there is no room for CoT."""
+    return ResponseSchema(
+        name="mcq_answer", strict=True,
+        json_schema=JSONSchema(
+            type="object",
+            properties={"answer": JSONSchema(type="string", enum=list(item.letters))},
+            required=["answer"], additionalProperties=False))
+
+
+def _structured_letter(body: str) -> str | None:
+    """Pull the letter from a structured-output JSON body (`{"answer": "C"}`)."""
+    try:
+        j = json.loads(body)
+    except Exception:
+        return None
+    if isinstance(j, dict) and j.get("answer") is not None:
+        return extract_answer_letter(str(j["answer"]))
+    return None
+
+
 # ── live runners ──
-async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_source: str = "body") -> dict:
+async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_source: str = "body",
+                        no_cot_mechanism: str = NO_COT_PREFILL) -> dict:
     """`cot_source` selects which field is the JUDGED trace (channel-aware capture; SPEC_phase2 §2.1):
     "reasoning" for native_raw open weights (CoT in the `reasoning` field) or "body" for
     body_channel/disabled actors (CoT in `.completion`). The ANSWER is always parsed from the body.
-    The with-CoT arm NEVER prefills (so a thinking model's trace is not truncated); the no-CoT
-    necessity arm prefills `<answer>` (zeroing thinking is the intended forced-no-CoT check)."""
+    The with-CoT arm NEVER prefills (so a thinking model's trace is not truncated). The no-CoT
+    necessity arm forces an immediate answer via `no_cot_mechanism`: "prefill" (default — prefill
+    `<answer>`) or "structured_output" (a single-letter enum schema, for actors that 400 on prefill
+    such as Opus 4.8)."""
     prompt = build_prompt(item, hint, with_cot=with_cot)
+    structured = (not with_cot) and no_cot_mechanism == NO_COT_STRUCTURED
     if with_cot:
         out = await model.generate(prompt)
+        body = out.completion
+    elif structured:                        # forced no-CoT WITHOUT prefill: constrain to one letter
+        out = await model.generate(prompt, config=GenerateConfig(response_schema=_letter_schema(item)))
         body = out.completion
     else:                                   # force early answer: prefill the assistant turn
         out = await model.generate([ChatMessageUser(content=prompt), ChatMessageAssistant(content="<answer>")])
         body = "<answer>" + out.completion
     reasoning = extract_reasoning(out)
-    letter = extract_answer_letter(body)
-    if letter is None and reasoning:        # thinking models may state the answer only in the trace
-        letter = extract_answer_letter(reasoning)
+    if structured:
+        letter = _structured_letter(body) or extract_answer_letter(body)
+    else:
+        letter = extract_answer_letter(body)
+        if letter is None and reasoning:    # thinking models may state the answer only in the trace
+            letter = extract_answer_letter(reasoning)
     cot = reasoning if cot_source == "reasoning" else extract_cot(body)
     usage = getattr(out, "usage", None)
     return {"letter": letter,
@@ -170,7 +217,8 @@ async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_sourc
 
 async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arithmetic",
                    level: int = 1, seed: int | None = None, cot_source: str = "body",
-                   cot_modes: tuple[bool, ...] = (True, False), concurrency: int = 8) -> list[GridRecord]:
+                   cot_modes: tuple[bool, ...] = (True, False), concurrency: int = 8,
+                   no_cot_mechanism: str = NO_COT_PREFILL) -> list[GridRecord]:
     eff_seed = seed if seed is not None else _seed_from(item.id)
     rng = random.Random(eff_seed)
     target = rng.choice([i for i in range(item.n_options) if i != item.correct_index])
@@ -182,7 +230,8 @@ async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arith
     }
     conds = [(kind, hint, wc) for kind, hint in hints.items() for wc in cot_modes]
     results = await _bounded_gather(
-        [run_condition(model, item, hint, with_cot=wc, cot_source=cot_source)
+        [run_condition(model, item, hint, with_cot=wc, cot_source=cot_source,
+                       no_cot_mechanism=no_cot_mechanism)
          for (_, hint, wc) in conds for _ in range(n_samples)],
         concurrency)
     records: list[GridRecord] = []
@@ -205,10 +254,13 @@ async def run_grid(model, item: MCQItem, *, n_samples: int, family: str = "arith
 
 async def run_sweep(model, item: MCQItem, *, n_samples: int, levels: tuple[int, ...] = (1, 2, 3),
                     family: str = "arithmetic", seed: int | None = None, cot_source: str = "body",
-                    cot_modes: tuple[bool, ...] = (True, False), concurrency: int = 8) -> list[GridRecord]:
+                    cot_modes: tuple[bool, ...] = (True, False), concurrency: int = 8,
+                    no_cot_mechanism: str = NO_COT_PREFILL) -> list[GridRecord]:
     """Powered §3.1 sweep (SPEC_phase2 §2/Step 3): conditions none / simple / complex@each level,
     each in BOTH with-CoT (judged) AND no-CoT (necessity) arms. All hints share ONE randomised wrong
-    target so the no-hint cell is a clean baseline. hint_kind ∈ {none, simple, complex_L1, …}."""
+    target so the no-hint cell is a clean baseline. hint_kind ∈ {none, simple, complex_L1, …}.
+    `no_cot_mechanism` selects the no-CoT forcing ("prefill" default, or "structured_output" for
+    prefill-rejecting actors like Opus 4.8)."""
     eff_seed = seed if seed is not None else _seed_from(item.id)
     rng = random.Random(eff_seed)
     target = rng.choice([i for i in range(item.n_options) if i != item.correct_index])
@@ -221,7 +273,8 @@ async def run_sweep(model, item: MCQItem, *, n_samples: int, levels: tuple[int, 
                                                           family=family, level=lv, target=target)))
     flat = [(kind, hint, wc) for (kind, hint) in conds for wc in cot_modes]
     results = await _bounded_gather(
-        [run_condition(model, item, hint, with_cot=wc, cot_source=cot_source)
+        [run_condition(model, item, hint, with_cot=wc, cot_source=cot_source,
+                       no_cot_mechanism=no_cot_mechanism)
          for (_, hint, wc) in flat for _ in range(n_samples)], concurrency)
     records: list[GridRecord] = []
     for ci, (kind, hint, wc) in enumerate(flat):
@@ -270,17 +323,21 @@ def rollout_row(rec: GridRecord, item: MCQItem) -> dict:
     )
 
 
-async def question_uplift(model, items, *, n_samples: int):
+async def question_uplift(model, items, *, n_samples: int, cot_source: str = "body",
+                          no_cot_mechanism: str = NO_COT_PREFILL):
     """Per-item question necessity (the §3.1 PRECONDITION): with-CoT vs no-CoT pass rate.
-    Returns uplift_filter.ItemUplift list -> feed select_uplift_set to keep CoT-necessary items."""
+    Returns uplift_filter.ItemUplift list -> feed select_uplift_set to keep CoT-necessary items.
+    `no_cot_mechanism` selects the no-CoT forcing (prefill, or structured_output for Opus 4.8)."""
     from cot_mon.monitors import uplift_filter as uf
 
     results = []
     for it in items:
         cot_hits = nocot_hits = 0
         for _ in range(n_samples):
-            cot_hits += (await run_condition(model, it, None, with_cot=True))["picks_index"] == it.correct_index
-            nocot_hits += (await run_condition(model, it, None, with_cot=False))["picks_index"] == it.correct_index
+            cot_hits += (await run_condition(model, it, None, with_cot=True,
+                                             cot_source=cot_source))["picks_index"] == it.correct_index
+            nocot_hits += (await run_condition(model, it, None, with_cot=False, cot_source=cot_source,
+                                               no_cot_mechanism=no_cot_mechanism))["picks_index"] == it.correct_index
         results.append(uf.ItemUplift(it.id, n_samples, cot_hits / n_samples, nocot_hits / n_samples))
     return results
 

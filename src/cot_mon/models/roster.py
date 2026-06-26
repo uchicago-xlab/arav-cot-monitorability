@@ -66,6 +66,7 @@ class RosterEntry:
     uplift_set: str | None
     experiments: tuple[str, ...] = ()
     roles: tuple[str, ...] = ()
+    no_cot_mechanism: str = "prefill"  # "prefill" | "structured_output" (prefill-rejecting actors)
     notes: str | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -92,6 +93,7 @@ def _coerce(name: str, kind: str, spec: dict[str, Any]) -> RosterEntry:
         uplift_set=spec.get("uplift_set"),
         experiments=tuple(spec.get("experiments", ()) or ()),
         roles=tuple(spec.get("role", ()) or ()),
+        no_cot_mechanism=spec.get("no_cot_mechanism", "prefill"),
         notes=spec.get("notes"),
         raw=spec,
     )
@@ -146,14 +148,20 @@ def build_model(
     No network happens here — only at generate time.
     """
     e = get_entry(name, path=path)
+    cfg = config or GenerateConfig()
+    if e.id.startswith("anthropic/"):
+        # Opus 4.8 (and the 4.6+/Fable family) REJECT temperature/top_p/top_k with a 400 — strip
+        # them on the native anthropic path (the sweep sets temperature=0.7). reasoning_enabled is an
+        # OpenRouter arg and is not forwarded here either (thinking-off = omit the thinking config).
+        cfg = cfg.model_copy(update={"temperature": None, "top_p": None, "top_k": None})
     margs: dict[str, Any] = {}
     if e.provider_pin is not None:
         margs["provider"] = e.provider_pin
     re_val = e.reasoning_enabled if reasoning_enabled is _UNSET else reasoning_enabled
-    if re_val is not None:
+    if re_val is not None and not e.id.startswith("anthropic/"):
         margs["reasoning_enabled"] = re_val
     margs.update(extra_model_args)
-    return get_model(e.id, config=config or GenerateConfig(), **margs)
+    return get_model(e.id, config=cfg, **margs)
 
 
 def judged_cot_source(cot_access: str | None) -> str:
@@ -188,4 +196,5 @@ def describe(name: str, *, path: Path | str = DEFAULT_CONFIG) -> dict[str, Any]:
         "cot_access": e.cot_access, "cot_source": judged_cot_source(e.cot_access),
         "reasoning_enabled": e.reasoning_enabled,
         "tier": e.tier, "necessity": e.necessity, "uplift_set": e.uplift_set,
+        "no_cot_mechanism": e.no_cot_mechanism,
     }

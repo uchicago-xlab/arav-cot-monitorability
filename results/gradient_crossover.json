@@ -1,0 +1,703 @@
+{
+  "config": {
+    "items": 8,
+    "seed": 20,
+    "actors": [
+      "gemini_2_5_flash",
+      "gemini_3_flash",
+      "gpt_5_5"
+    ],
+    "B_base": [
+      3,
+      10,
+      32,
+      100,
+      316,
+      1000
+    ],
+    "B_strong": [
+      3,
+      10,
+      32,
+      100,
+      316,
+      1000,
+      3162
+    ],
+    "c": 2,
+    "git_sha": "b6ef92ce0763f1fc2620e975e02d2d88129e9104"
+  },
+  "crossover": {
+    "gemini_2_5_flash": null,
+    "gemini_3_flash": null,
+    "gpt_5_5": null
+  },
+  "summaries": {
+    "gemini_2_5_flash": [
+      {
+        "actor": "gemini_2_5_flash",
+        "B": 3,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 3,
+          "n": 8,
+          "rate": 0.375,
+          "lo": 0.1340695840364472,
+          "hi": 0.6992637492968862
+        },
+        "correct": {
+          "k": 5,
+          "n": 8,
+          "rate": 0.625,
+          "lo": 0.3007362507031139,
+          "hi": 0.8659304159635528
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 4,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gemini_2_5_flash",
+        "B": 10,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 0,
+          "n": 8,
+          "rate": 0.0,
+          "lo": 0.0,
+          "hi": 0.3333333333333333
+        },
+        "correct": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 3,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gemini_2_5_flash",
+        "B": 32,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 3,
+          "n": 8,
+          "rate": 0.375,
+          "lo": 0.1340695840364472,
+          "hi": 0.6992637492968862
+        },
+        "correct": {
+          "k": 5,
+          "n": 8,
+          "rate": 0.625,
+          "lo": 0.3007362507031139,
+          "hi": 0.8659304159635528
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 3,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gemini_2_5_flash",
+        "B": 100,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 2,
+          "n": 8,
+          "rate": 0.25,
+          "lo": 0.06981019498596835,
+          "hi": 0.5968564716806983
+        },
+        "correct": {
+          "k": 6,
+          "n": 8,
+          "rate": 0.75,
+          "lo": 0.40314352831930167,
+          "hi": 0.9301898050140316
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 6,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gemini_2_5_flash",
+        "B": 316,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 3,
+          "n": 8,
+          "rate": 0.375,
+          "lo": 0.1340695840364472,
+          "hi": 0.6992637492968862
+        },
+        "correct": {
+          "k": 5,
+          "n": 8,
+          "rate": 0.625,
+          "lo": 0.3007362507031139,
+          "hi": 0.8659304159635528
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 5,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gemini_2_5_flash",
+        "B": 1000,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 0,
+          "n": 8,
+          "rate": 0.0,
+          "lo": 0.0,
+          "hi": 0.3333333333333333
+        },
+        "correct": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 8,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      }
+    ],
+    "gemini_3_flash": [
+      {
+        "actor": "gemini_3_flash",
+        "B": 3,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 0,
+          "n": 8,
+          "rate": 0.0,
+          "lo": 0.0,
+          "hi": 0.3333333333333333
+        },
+        "correct": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "solve": {
+          "k": 7,
+          "n": 7,
+          "rate": 1.0,
+          "lo": 0.6363636363636362,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 8,
+        "corrected_after_commit": 8,
+        "n_forced": 8,
+        "n_control": 7,
+        "n_err": 1
+      },
+      {
+        "actor": "gemini_3_flash",
+        "B": 10,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 0,
+          "n": 8,
+          "rate": 0.0,
+          "lo": 0.0,
+          "hi": 0.3333333333333333
+        },
+        "correct": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "solve": {
+          "k": 7,
+          "n": 7,
+          "rate": 1.0,
+          "lo": 0.6363636363636362,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 8,
+        "corrected_after_commit": 6,
+        "n_forced": 8,
+        "n_control": 7,
+        "n_err": 1
+      },
+      {
+        "actor": "gemini_3_flash",
+        "B": 32,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 0,
+          "n": 8,
+          "rate": 0.0,
+          "lo": 0.0,
+          "hi": 0.3333333333333333
+        },
+        "correct": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 7,
+        "corrected_after_commit": 2,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gemini_3_flash",
+        "B": 100,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 1,
+          "n": 8,
+          "rate": 0.125,
+          "lo": 0.021782267706180775,
+          "hi": 0.47821773229381925
+        },
+        "correct": {
+          "k": 7,
+          "n": 8,
+          "rate": 0.875,
+          "lo": 0.5217822677061807,
+          "hi": 0.9782177322938193
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 4,
+        "corrected_after_commit": 3,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gemini_3_flash",
+        "B": 316,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 2,
+          "n": 8,
+          "rate": 0.25,
+          "lo": 0.06981019498596835,
+          "hi": 0.5968564716806983
+        },
+        "correct": {
+          "k": 6,
+          "n": 8,
+          "rate": 0.75,
+          "lo": 0.40314352831930167,
+          "hi": 0.9301898050140316
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 3,
+        "corrected_after_commit": 3,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gemini_3_flash",
+        "B": 1000,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 2,
+          "n": 8,
+          "rate": 0.25,
+          "lo": 0.06981019498596835,
+          "hi": 0.5968564716806983
+        },
+        "correct": {
+          "k": 6,
+          "n": 8,
+          "rate": 0.75,
+          "lo": 0.40314352831930167,
+          "hi": 0.9301898050140316
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 5,
+        "corrected_after_commit": 6,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gemini_3_flash",
+        "B": 3162,
+        "provider": "google-vertex",
+        "adopt": {
+          "k": 3,
+          "n": 8,
+          "rate": 0.375,
+          "lo": 0.1340695840364472,
+          "hi": 0.6992637492968862
+        },
+        "correct": {
+          "k": 5,
+          "n": 8,
+          "rate": 0.625,
+          "lo": 0.3007362507031139,
+          "hi": 0.8659304159635528
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 4,
+        "corrected_after_commit": 4,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      }
+    ],
+    "gpt_5_5": [
+      {
+        "actor": "gpt_5_5",
+        "B": 3,
+        "provider": "openai",
+        "adopt": {
+          "k": 0,
+          "n": 8,
+          "rate": 0.0,
+          "lo": 0.0,
+          "hi": 0.3333333333333333
+        },
+        "correct": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 0,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gpt_5_5",
+        "B": 10,
+        "provider": "openai",
+        "adopt": {
+          "k": 1,
+          "n": 8,
+          "rate": 0.125,
+          "lo": 0.021782267706180775,
+          "hi": 0.47821773229381925
+        },
+        "correct": {
+          "k": 7,
+          "n": 8,
+          "rate": 0.875,
+          "lo": 0.5217822677061807,
+          "hi": 0.9782177322938193
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 1,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gpt_5_5",
+        "B": 32,
+        "provider": "openai",
+        "adopt": {
+          "k": 1,
+          "n": 8,
+          "rate": 0.125,
+          "lo": 0.021782267706180775,
+          "hi": 0.47821773229381925
+        },
+        "correct": {
+          "k": 7,
+          "n": 8,
+          "rate": 0.875,
+          "lo": 0.5217822677061807,
+          "hi": 0.9782177322938193
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 1,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gpt_5_5",
+        "B": 100,
+        "provider": "openai",
+        "adopt": {
+          "k": 1,
+          "n": 8,
+          "rate": 0.125,
+          "lo": 0.021782267706180775,
+          "hi": 0.47821773229381925
+        },
+        "correct": {
+          "k": 7,
+          "n": 8,
+          "rate": 0.875,
+          "lo": 0.5217822677061807,
+          "hi": 0.9782177322938193
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 0,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gpt_5_5",
+        "B": 316,
+        "provider": "openai",
+        "adopt": {
+          "k": 3,
+          "n": 8,
+          "rate": 0.375,
+          "lo": 0.1340695840364472,
+          "hi": 0.6992637492968862
+        },
+        "correct": {
+          "k": 5,
+          "n": 8,
+          "rate": 0.625,
+          "lo": 0.3007362507031139,
+          "hi": 0.8659304159635528
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 0,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gpt_5_5",
+        "B": 1000,
+        "provider": "openai",
+        "adopt": {
+          "k": 0,
+          "n": 8,
+          "rate": 0.0,
+          "lo": 0.0,
+          "hi": 0.3333333333333333
+        },
+        "correct": {
+          "k": 7,
+          "n": 8,
+          "rate": 0.875,
+          "lo": 0.5217822677061807,
+          "hi": 0.9782177322938193
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 1,
+        "no_answer": 0,
+        "visible_correction": 0,
+        "corrected_after_commit": 0,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      },
+      {
+        "actor": "gpt_5_5",
+        "B": 3162,
+        "provider": "openai",
+        "adopt": {
+          "k": 2,
+          "n": 8,
+          "rate": 0.25,
+          "lo": 0.06981019498596835,
+          "hi": 0.5968564716806983
+        },
+        "correct": {
+          "k": 6,
+          "n": 8,
+          "rate": 0.75,
+          "lo": 0.40314352831930167,
+          "hi": 0.9301898050140316
+        },
+        "solve": {
+          "k": 8,
+          "n": 8,
+          "rate": 1.0,
+          "lo": 0.6666666666666667,
+          "hi": 1.0
+        },
+        "other": 0,
+        "no_answer": 0,
+        "visible_correction": 1,
+        "corrected_after_commit": 0,
+        "n_forced": 8,
+        "n_control": 8,
+        "n_err": 0
+      }
+    ]
+  }
+}

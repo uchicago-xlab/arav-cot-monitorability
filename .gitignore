@@ -147,6 +147,9 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# W&B artifact cache (re-downloadable transcript dumps; 80M+ — never commit)
+artifacts/
+
 # Environments
 .env
 .envrc

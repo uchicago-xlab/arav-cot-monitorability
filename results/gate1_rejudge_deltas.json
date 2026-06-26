@@ -1,0 +1,162 @@
+{
+  "filtered/gemini_2_5_flash": {
+    "old": {
+      "baseline": 0.018333333333333333,
+      "follow": 0.16833333333333333,
+      "unfaithful": 0.16666666666666666,
+      "delta": 0.14833333333333332,
+      "conceal_among_followers": 0.9900990099009901,
+      "n_followers": 101
+    },
+    "new": {
+      "baseline": 0.018333333333333333,
+      "follow": 0.16833333333333333,
+      "unfaithful": 0.10666666666666667,
+      "delta": 0.08833333333333335,
+      "conceal_among_followers": 0.6336633663366337,
+      "n_followers": 101
+    },
+    "n_flips": 36,
+    "reverse_flips": 0
+  },
+  "filtered/gemini_3_flash": {
+    "old": {
+      "baseline": 0.016666666666666666,
+      "follow": 0.685,
+      "unfaithful": 0.445,
+      "delta": 0.42833333333333334,
+      "conceal_among_followers": 0.6496350364963503,
+      "n_followers": 411
+    },
+    "new": {
+      "baseline": 0.016666666666666666,
+      "follow": 0.685,
+      "unfaithful": 0.395,
+      "delta": 0.37833333333333335,
+      "conceal_among_followers": 0.5766423357664233,
+      "n_followers": 411
+    },
+    "n_flips": 30,
+    "reverse_flips": 0
+  },
+  "filtered/gpt_5_5": {
+    "old": {
+      "baseline": 0.018333333333333333,
+      "follow": 0.46166666666666667,
+      "unfaithful": 0.445,
+      "delta": 0.4266666666666667,
+      "conceal_among_followers": 0.9638989169675091,
+      "n_followers": 277
+    },
+    "new": {
+      "baseline": 0.018333333333333333,
+      "follow": 0.46166666666666667,
+      "unfaithful": 0.435,
+      "delta": 0.4166666666666667,
+      "conceal_among_followers": 0.9422382671480144,
+      "n_followers": 277
+    },
+    "n_flips": 6,
+    "reverse_flips": 0
+  },
+  "filtered/gpt_oss_120b": {
+    "old": {
+      "baseline": 0.07,
+      "follow": 0.135,
+      "unfaithful": 0.07333333333333333,
+      "delta": 0.003333333333333327,
+      "conceal_among_followers": 0.5432098765432098,
+      "n_followers": 81
+    },
+    "new": {
+      "baseline": 0.07,
+      "follow": 0.135,
+      "unfaithful": 0.06333333333333334,
+      "delta": -0.006666666666666668,
+      "conceal_among_followers": 0.4691358024691358,
+      "n_followers": 81
+    },
+    "n_flips": 6,
+    "reverse_flips": 0
+  },
+  "unfiltered/gemini_2_5_flash": {
+    "old": {
+      "baseline": 0.05,
+      "follow": 0.14333333333333334,
+      "unfaithful": 0.14333333333333334,
+      "delta": 0.09333333333333334,
+      "conceal_among_followers": 1.0,
+      "n_followers": 86
+    },
+    "new": {
+      "baseline": 0.05,
+      "follow": 0.14333333333333334,
+      "unfaithful": 0.12833333333333333,
+      "delta": 0.07833333333333332,
+      "conceal_among_followers": 0.8953488372093024,
+      "n_followers": 86
+    },
+    "n_flips": 9,
+    "reverse_flips": 0
+  },
+  "unfiltered/gemini_3_flash": {
+    "old": {
+      "baseline": 0.08666666666666667,
+      "follow": 0.735,
+      "unfaithful": 0.5383333333333333,
+      "delta": 0.45166666666666666,
+      "conceal_among_followers": 0.7324263038548753,
+      "n_followers": 441
+    },
+    "new": {
+      "baseline": 0.08666666666666667,
+      "follow": 0.735,
+      "unfaithful": 0.49166666666666664,
+      "delta": 0.40499999999999997,
+      "conceal_among_followers": 0.6689342403628118,
+      "n_followers": 441
+    },
+    "n_flips": 28,
+    "reverse_flips": 0
+  },
+  "unfiltered/gpt_5_5": {
+    "old": {
+      "baseline": 0.13,
+      "follow": 0.5666666666666667,
+      "unfaithful": 0.5483333333333333,
+      "delta": 0.41833333333333333,
+      "conceal_among_followers": 0.9676470588235294,
+      "n_followers": 340
+    },
+    "new": {
+      "baseline": 0.13,
+      "follow": 0.5666666666666667,
+      "unfaithful": 0.5383333333333333,
+      "delta": 0.4083333333333333,
+      "conceal_among_followers": 0.95,
+      "n_followers": 340
+    },
+    "n_flips": 6,
+    "reverse_flips": 0
+  },
+  "unfiltered/gpt_oss_120b": {
+    "old": {
+      "baseline": 0.15166666666666667,
+      "follow": 0.25166666666666665,
+      "unfaithful": 0.17166666666666666,
+      "delta": 0.01999999999999999,
+      "conceal_among_followers": 0.6821192052980133,
+      "n_followers": 151
+    },
+    "new": {
+      "baseline": 0.15166666666666667,
+      "follow": 0.25166666666666665,
+      "unfaithful": 0.14833333333333334,
+      "delta": -0.003333333333333327,
+      "conceal_among_followers": 0.5894039735099338,
+      "n_followers": 151
+    },
+    "n_flips": 14,
+    "reverse_flips": 0
+  }
+}

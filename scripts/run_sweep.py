@@ -57,6 +57,7 @@ def _openrouter_price(model_id: str) -> tuple[float, float]:
 async def run_actor(name, args):
     entry = roster.get_entry(name)
     cot_source = roster.judged_cot_source(entry.cot_access)
+    no_cot_mechanism = entry.no_cot_mechanism            # prefill, or structured_output (Opus 4.8 etc.)
     max_tokens = max(args.max_tokens, 8000) if cot_source == "reasoning" else args.max_tokens
     model = roster.build_model(name, config=GenerateConfig(temperature=args.temperature, max_tokens=max_tokens))
     levels = tuple(args.levels)
@@ -64,8 +65,8 @@ async def run_actor(name, args):
     # the filtered logs/transcripts (the unfiltered run answers "does §3.1 survive without the gate").
     tag = "_unfiltered" if args.no_filter else ""
     experiment = "exp_hints_sweep" + tag
-    print(f"\n=== {name}  (cot_source={cot_source}, max_tokens={max_tokens}, item_filter="
-          f"{'none' if args.no_filter else 'correct_with_cot'}) ===", flush=True)
+    print(f"\n=== {name}  (cot_source={cot_source}, no_cot={no_cot_mechanism}, max_tokens={max_tokens}, "
+          f"item_filter={'none' if args.no_filter else 'correct_with_cot'}) ===", flush=True)
 
     items = data.load_gpqa(n=args.candidates)
     t0 = time.monotonic()
@@ -83,7 +84,8 @@ async def run_actor(name, args):
     records = []
     for i, it in enumerate(kept):
         records += await solver.run_sweep(model, it, n_samples=args.n_samples, levels=levels,
-                                          seed=args.seed, cot_source=cot_source, concurrency=args.concurrency)
+                                          seed=args.seed, cot_source=cot_source, concurrency=args.concurrency,
+                                          no_cot_mechanism=no_cot_mechanism)
         if (i + 1) % 10 == 0:
             print(f"  [{name}] ... {i + 1}/{len(kept)} items swept", flush=True)
     wall = time.monotonic() - t0
