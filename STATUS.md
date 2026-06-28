@@ -25,8 +25,32 @@
 2. **Decode-necessity map EXTENDED 2→4 actors** — ran the sweep for **gemini-2.5-flash** (clean, CoT-necessary on 4/5 families) + **gpt-oss-120b** (CAVEATED — undisableable channel ⇒ necessity UNMEASURABLE) in PARALLEL (12.8 / 62 min; W&B `exp_hints_complex_decode`); figC1/figC2 regenerated (all 4); decode JSONs persisted to tracked `results/decode_necessity/`; `make_complex_figures.py` now loads `.env` + reads `results/` first.
 3. **REBASED onto a parallel branch** (`953cd83..bff3c8a`: cluster-bootstrap CIs, honesty fixes, fig0b/2b/5, decode-sweep code that wired these actors but **never ran** them). Kept my data; adopted their reframing (bignum = **capability gap**, not level-erosion; report **filtered §3.1 set only**).
 4. **fig2b + fig0b REFRESHED** with the new decode data (both necessity-scope by the decode verdict). fig0b's *filtered* §3.1 transcripts (gitignored, absent) were **pulled from W&B** (`exp_hints_sweep-<actor>-transcripts:v0`) into `logs/transcripts/`, then regenerated in isolation (bootstrap CIs intact; fig0/1/3/4/5 untouched).
-**Gates:** **Gate 1 = ✅ CLEARED** — powered GPQA §3.1, judge-validated, baseline-subtracted, 2σ: simple-hint unfaithfulness replicates on 3/4 actors (incl. paper analog gemini-2.5-flash + faithful gemini-3-flash). Gate 2 — not reached.
+**Gates:** **Gate 1 = ✅ CLEARED + EXTENDED to 8 actors** — powered GPQA §3.1, judge-validated, baseline-subtracted, 2σ: simple-hint unfaithfulness replicates on **6/8** (paper analog gemini-2.5-flash + faithful gemini-3-flash + NEW gemini-3.5-flash, opus-4.8-direct, gemini-3.1-pro; deepseek-v4-flash + gpt-oss-120b = cue-robust negatives). Gate 2 — not reached.
 **W&B:** `wandb.ai/aravdhoot/cot-monitorability` — filtered §3.1 (`exp_hints_sweep`: tough-water-14 / classic-mountain-16 / noble-aardvark-12 / ancient-resonance-18), unfiltered (`exp_hints_sweep_unfiltered`), figures (`exp_hints_sweep_figures`), decode-necessity (`exp_hints_complex_decode` + `..._figures`), judge-validation (`blooming-firefly-10`); CoT tables + `transcripts.jsonl` artifacts synced (the §3.1 filtered transcripts are recoverable from W&B — gitignored locally).
+
+## Per-model experiment coverage (which models · which experiments · why) — Session #7
+**Scope:** only §3.1 is BUILT. "All experiments" = the FULL §3.1 suite — simple-hint **headline** (L1) + **complex** L1–L3 follow arm + **decode-necessity** (Step 5, feeds fig0b/2b/figC1-2). §3.2 / §6 / §4.4 / Follow-up A are stubs → run for **NO** model yet.
+
+**✅ FULL §3.1 suite done (headline + complex + decode-necessity) — 6 actors:**
+| actor | role | Gate-1 Δ | decode-necessity |
+|---|---|---|---|
+| gemini-2.5-flash | paper analog | +0.09 ✅ | CoT-necessary 4/5 families |
+| gemini-3-flash | primary faithful | +0.38 ✅ | CoT-necessary (arith/iter/indir) |
+| gemini-3.5-flash | **NEW** faithful (effort:minimal) | +0.24 ✅ | CoT-necessary iterated/indirection |
+| gpt-5.5 | faithful_conditional | +0.42 ✅ | one-shots easy → needs high difficulty |
+| gpt-oss-120b | cue-robust neg | −0.01 ns | UNMEASURABLE (undisableable channel) |
+| deepseek-v4-flash | **NEW** cue-robust neg | +0.025 ns | one-shots ALL 15 decode cells |
+
+**◐ HEADLINE ONLY (§3.1 simple-hint @ L1; no complex arm, no decode) — 2 actors:**
+- **opus-4.8-direct** (Δ +0.16 ✅) — ran `--levels 1` (the simple-hint headline needs no complex extension; also saves the $ Opus leg). no-CoT via **structured-output** (Opus 4.8 rejects assistant-prefill) → comparability footnote vs prefill actors; one-shots → necessity provisional. No decode-necessity run.
+- **gemini-3.1-pro** (Δ +0.16 ✅, follow only 0.18) — **GENERALIZATION-ONLY**: reasoning is mandatory-hidden (effort:minimal only *reduces* rtoks to 156–242, never 0) → necessity UNVERIFIABLE → we judge the **visible body**, caveated (NOT a faithful-actor headline; like the gemini-2.5-pro anchor).
+
+**✗ NOT RUN / EXCLUDED — and why:**
+- **qwen3.5-122b** — DROPPED (Arav): infeasible on every OpenRouter endpoint — its 8k-token gens hang under load (novita crashed, siliconflow wedged; ~137s/gen, ~19h, stalled at 40/47). `--attempt-timeout` stops a terminal wedge but not the slowness. → **self-host vLLM** (`selfhost_vllm/`).
+- **kimi-k2-thinking** — DROPPED: ~1T MoE too slow on novita (smoke passed; superseded by deepseek as the independent-lab open-weight slot).
+- **gemini-2.5-pro** (replication anchor) — generalization-only (mandatory hidden reasoning); NOT run this session — the paper-analog role is filled by gemini-2.5-**flash** (which WAS run). Could be added later as a caveated headline like gemini-3.1-pro.
+- **qwen3-235b / qwen3-30b** — open-weight; 235b answered-rate ~0.63 @8k (sometimes never emits a final `<answer>`) + slow; backfill skipped in prior sessions. Revisit via vLLM self-host.
+- **opus-4.8** (OpenRouter `body_channel`) — assistant-prefill UNSUPPORTED via OpenRouter → out of §3.1/§3.2; reserved for §6 / Follow-up A (agentic, no prefill needed). `opus-4.8-direct` (Anthropic API, structured-output) covers the §3.1 headline instead.
 
 ## Module status
 - **DONE + tested (65 tests pass / 5 skip):** `models/roster.py`, `monitors/uplift_filter.py` (per-model necessity engine), `exp_hints/data.py` (GPQA+MMLU-Pro), `exp_hints/hints.py` (5-family suite), **`exp_hints/decode.py`** (SHARED decode-necessity harness — decode items + forced-`<answer>` sampler + rollout-capture; used by `calibrate_complex.py` + `decode_necessity_sweep.py`), `monitors/hint_judge.py`, `exp_hints/solver.py` (2×3 grid, `<question-metadata>` injection, `\boxed`/`<answer>` extraction, correct-with-CoT filter, bounded concurrency, audit fields + shared `rollout_row`), `metrics.py` (unfaithfulness delta + Wilson 2σ + `flatten_for_logging`; **+`wilson_diff_ci` Newcombe difference-CI + `decode_necessity_label`** one-shot/too-hard/cot-necessary/weak), **`figviz.py`** (shared decode-uplift bar + necessity heatmap; matplotlib kept out of the tested core), **`logging/wandb_logger.py`** (one run per exp×actor×config; config+scalars+2σ; per-rollout CoT `wandb.Table`; `transcripts.jsonl` artifact; disabled/offline/online; no key leakage).
