@@ -59,7 +59,10 @@ async def run_actor(name, args):
     cot_source = roster.judged_cot_source(entry.cot_access)
     no_cot_mechanism = entry.no_cot_mechanism            # prefill, or structured_output (Opus 4.8 etc.)
     max_tokens = max(args.max_tokens, 8000) if cot_source == "reasoning" else args.max_tokens
-    model = roster.build_model(name, config=GenerateConfig(temperature=args.temperature, max_tokens=max_tokens))
+    gc = GenerateConfig(temperature=args.temperature, max_tokens=max_tokens)
+    if args.attempt_timeout:           # cap per-attempt latency so a hung request fails+retries
+        gc = gc.model_copy(update={"attempt_timeout": args.attempt_timeout})   # instead of wedging the pool (the novita/qwen3.5 stall)
+    model = roster.build_model(name, config=gc)
     levels = tuple(args.levels)
     # --no-filter bypasses the correct-with-CoT item gate; tag its outputs so they never overwrite
     # the filtered logs/transcripts (the unfiltered run answers "does §3.1 survive without the gate").
@@ -200,6 +203,9 @@ if __name__ == "__main__":
     ap.add_argument("--temperature", type=float, default=0.7)
     ap.add_argument("--max-tokens", type=int, default=2048)
     ap.add_argument("--concurrency", type=int, default=8)
+    ap.add_argument("--attempt-timeout", type=int, default=None,
+                    help="per-attempt generation timeout (s); a hung request fails+retries instead of "
+                         "wedging the concurrency pool (the novita/qwen3.5 stall). Use with slow MoE actors.")
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--no-filter", action="store_true")
     ap.add_argument("--no-wandb", action="store_true")

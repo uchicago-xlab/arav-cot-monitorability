@@ -33,22 +33,30 @@ from matplotlib.patches import Patch  # noqa: E402
 from cot_mon import figviz, metrics  # noqa: E402
 from cot_mon.metrics import load_withcot_rollouts  # noqa: E402  (explicit-selector transcript loader)
 
-ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gpt_5_5", "gpt_oss_120b", "qwen3_30b"]
+ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "gpt_oss_120b",
+         "qwen3_30b", "qwen3_5_122b", "deepseek_v4_flash", "opus_4_8_direct", "gemini_3_1_pro"]
 LABEL = {"gemini_2_5_flash": "gemini-2.5-flash\n(paper)", "gemini_3_flash": "gemini-3-flash",
-         "gpt_5_5": "gpt-5.5", "gpt_oss_120b": "gpt-oss-120b", "qwen3_30b": "qwen3-30b"}
+         "gemini_3_5_flash": "gemini-3.5-flash", "gpt_5_5": "gpt-5.5", "gpt_oss_120b": "gpt-oss-120b",
+         "qwen3_30b": "qwen3-30b", "qwen3_5_122b": "qwen3.5-122b", "deepseek_v4_flash": "deepseek-v4-flash",
+         "opus_4_8_direct": "opus-4.8\n(struct no-CoT†)", "gemini_3_1_pro": "gemini-3.1-pro\n(gen-only‡)"}
 LEVELS = ["complex_L1", "complex_L2", "complex_L3"]
 LV_SHORT = {"complex_L1": "L1", "complex_L2": "L2", "complex_L3": "L3"}
 FIGDIR = Path("figures/3p1_replication")
 
-# Fig 0 (paper analog): the four body-CoT actors whose with-CoT trace is genuinely judgeable —
-# gemini-2.5-flash (reasoning=none body) + gemini-3-flash (channel-disabled) read their body; gpt-5.5
-# (reasoning:{enabled:false}) body; gpt-oss-120b native_raw (CoT in its reasoning field). For every
-# one the transcript's judge_verdict was already scored against that actor's correct trace at sweep
-# time (solver runs the judge cot_source-aware), so the loader just reads it. The Pro tier (mandatory
-# hidden reasoning) stays out of the judged arm — see analysis/3p1_replication.md.
-JUDGEABLE = ["gemini_2_5_flash", "gemini_3_flash", "gpt_5_5", "gpt_oss_120b"]
+# Fig 0 (paper analog): actors whose with-CoT trace is genuinely judgeable — gemini-2.5-flash
+# (reasoning=none body), gemini-3-flash + gemini-3.5-flash (channel-disabled: enabled:false resp.
+# effort:minimal -> rtoks=0, body CoT), gpt-5.5 (reasoning:{enabled:false} body), gpt-oss-120b +
+# deepseek-v4-flash + qwen3.5-122b native_raw (CoT in the reasoning field), opus-4.8-direct (body,
+# structured no-CoT †). For each the transcript's judge_verdict was scored cot_source-aware at sweep
+# time, so the loader just reads it. gemini-3.1-pro (‡) is GENERALIZATION-ONLY — mandatory hidden
+# reasoning (effort:minimal only REDUCES it, never to 0), so we judge its VISIBLE body, NOT a faithful
+# hidden trace; included as a caveated datapoint per the user, not a faithful-actor headline.
+JUDGEABLE = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "gpt_oss_120b",
+             "qwen3_5_122b", "deepseek_v4_flash", "opus_4_8_direct", "gemini_3_1_pro"]
 ACTOR_COLOR = {"gemini_2_5_flash": "#444444", "gemini_3_flash": "#1b9e77",
-               "gpt_5_5": "#d95f02", "gpt_oss_120b": "#7570b3"}
+               "gemini_3_5_flash": "#66a61e", "gpt_5_5": "#d95f02", "gpt_oss_120b": "#7570b3",
+               "qwen3_5_122b": "#a6761d", "deepseek_v4_flash": "#e7298a",
+               "opus_4_8_direct": "#1f78b4", "gemini_3_1_pro": "#999999"}
 
 # Fig 0 transcript SETS — the experiment prefix is the data selector (see resolve_transcript). The
 # framing is "does the §3.1 follow-rate effect survive WITHOUT the item gate", NOT "the gate was

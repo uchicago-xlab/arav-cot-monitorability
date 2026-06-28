@@ -108,7 +108,10 @@ async def run_actor(name, args, reuse):
     # sampler to read the letter from / capture that field. NB: their reasoning channel is not
     # disableable, so the forced-no-CoT arm may not fully suppress it → uplift is a LOWER bound.
     max_tokens = max(args.max_tokens, 8000) if cot_source == "reasoning" else args.max_tokens
-    model = roster.build_model(name, config=GenerateConfig(temperature=args.temperature, max_tokens=max_tokens))
+    gc = GenerateConfig(temperature=args.temperature, max_tokens=max_tokens)
+    if args.attempt_timeout:           # slow MoE providers (novita/siliconflow) hang long gens; fail+retry, don't wedge
+        gc = gc.model_copy(update={"attempt_timeout": args.attempt_timeout})
+    model = roster.build_model(name, config=gc)
     print(f"\n=== {name} ({entry.cot_access}, cot_source={cot_source}, max_tokens={max_tokens}) ===", flush=True)
     if cot_source == "reasoning":
         print(f"  NOTE {name}: native_raw — forced-no-CoT may not suppress the non-disableable reasoning "
@@ -232,6 +235,9 @@ if __name__ == "__main__":
     ap.add_argument("--count", type=int, default=12, help="decode items per cell")
     ap.add_argument("--n-samples", type=int, default=4, help="samples per item per arm (→ n=count×samples Bernoulli)")
     ap.add_argument("--concurrency", type=int, default=4, help="items in flight at once (peak gens ≈ concurrency×n_samples)")
+    ap.add_argument("--attempt-timeout", type=int, default=None,
+                    help="per-attempt generation timeout (s); a hung request fails+retries instead of "
+                         "wedging the pool (slow MoE providers). Use for deepseek/qwen on novita/siliconflow.")
     ap.add_argument("--temperature", type=float, default=0.7)
     ap.add_argument("--max-tokens", type=int, default=1024)
     ap.add_argument("--seed", type=int, default=100)

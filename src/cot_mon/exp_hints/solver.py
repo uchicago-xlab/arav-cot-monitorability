@@ -103,14 +103,35 @@ def extract_cot(text: str) -> str:
     return text.split("<answer>", 1)[0].strip()
 
 
+def _real_reasoning_text(s: str) -> str:
+    """Strip the disabled-channel SIGNATURE artifact. When a mandatory-reasoning Gemini Flash is
+    channel-disabled (reasoning.effort=minimal -> rtoks=0), OpenRouter still returns a text-less
+    `reasoning.text` block carrying only an opaque thought SIGNATURE. Inspect can't parse it (no
+    `text` field) and dumps the raw reasoning_details JSON into ContentReasoning.reasoning. That is
+    NOT reasoning — return '' so the trace reads as genuinely empty (matches usage.reasoning_tokens=0).
+    Real native_raw CoT (qwen/gpt-oss/deepseek) is prose, not this JSON, so it passes through."""
+    t = s.strip()
+    if t.startswith("[") and "reasoning.text" in t and "signature" in t:
+        try:
+            arr = json.loads(t)
+            if isinstance(arr, list) and all(
+                    isinstance(d, dict) and not str(d.get("text") or "").strip() for d in arr):
+                return ""
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return s
+
+
 def extract_reasoning(output) -> str:
     """The raw reasoning trace from an Inspect output's ContentReasoning block(s). native_raw actors
-    (open weights via OpenRouter) emit their CoT here, SEPARATE from `.completion`; `''` if none."""
+    (open weights via OpenRouter) emit their CoT here, SEPARATE from `.completion`; `''` if none.
+    Text-less signature artifacts from a disabled channel are dropped (see _real_reasoning_text)."""
     msg = getattr(output, "message", None)
     content = getattr(msg, "content", None) if msg is not None else None
     if isinstance(content, list):
-        return "\n".join(c.reasoning for c in content
-                         if isinstance(c, ContentReasoning) and c.reasoning).strip()
+        parts = (_real_reasoning_text(c.reasoning) for c in content
+                 if isinstance(c, ContentReasoning) and c.reasoning)
+        return "\n".join(p for p in parts if p.strip()).strip()
     return ""
 
 

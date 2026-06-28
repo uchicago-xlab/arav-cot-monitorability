@@ -67,6 +67,9 @@ class RosterEntry:
     experiments: tuple[str, ...] = ()
     roles: tuple[str, ...] = ()
     no_cot_mechanism: str = "prefill"  # "prefill" | "structured_output" (prefill-rejecting actors)
+    reasoning_effort: str | None = None  # OpenRouter reasoning.effort (minimal/low/...); the ONLY
+    #   hidden-channel disable for mandatory-reasoning Flash models (e.g. gemini-3.5-flash:
+    #   effort=minimal -> rtoks=0, reasons in body; enabled:false/max_tokens:0 both 400).
     notes: str | None = None
     raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -94,6 +97,7 @@ def _coerce(name: str, kind: str, spec: dict[str, Any]) -> RosterEntry:
         experiments=tuple(spec.get("experiments", ()) or ()),
         roles=tuple(spec.get("role", ()) or ()),
         no_cot_mechanism=spec.get("no_cot_mechanism", "prefill"),
+        reasoning_effort=spec.get("reasoning_effort"),
         notes=spec.get("notes"),
         raw=spec,
     )
@@ -154,6 +158,10 @@ def build_model(
         # them on the native anthropic path (the sweep sets temperature=0.7). reasoning_enabled is an
         # OpenRouter arg and is not forwarded here either (thinking-off = omit the thinking config).
         cfg = cfg.model_copy(update={"temperature": None, "top_p": None, "top_k": None})
+    # reasoning.effort (OpenRouter): for mandatory-reasoning Flash models this is the channel-disable
+    # knob (gemini-3.5-flash: effort=minimal -> rtoks=0). Forwarded only on the OpenRouter path.
+    if e.reasoning_effort is not None and not e.id.startswith("anthropic/"):
+        cfg = cfg.model_copy(update={"reasoning_effort": e.reasoning_effort})
     margs: dict[str, Any] = {}
     if e.provider_pin is not None:
         margs["provider"] = e.provider_pin

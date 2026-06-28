@@ -28,9 +28,11 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from cot_mon import figviz  # noqa: E402
 
-ACTOR_ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gpt_5_5", "gpt_oss_120b"]
+ACTOR_ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "gpt_oss_120b",
+               "deepseek_v4_flash", "qwen3_5_122b"]
 ACTOR_LABEL = {"gemini_2_5_flash": "gemini-2.5-flash", "gemini_3_flash": "gemini-3-flash",
-               "gpt_5_5": "gpt-5.5", "gpt_oss_120b": "gpt-oss-120b"}
+               "gemini_3_5_flash": "gemini-3.5-flash", "gpt_5_5": "gpt-5.5", "gpt_oss_120b": "gpt-oss-120b",
+               "deepseek_v4_flash": "deepseek-v4-flash", "qwen3_5_122b": "qwen3.5-122b"}
 FAMILY_ORDER = ["arithmetic", "bignum", "iterated", "deductive", "indirection"]
 LEVELS = ["L1", "L2", "L3"]
 FIGDIR = Path("figures/3p1_complex_hints")

@@ -60,14 +60,14 @@ actors:
     notes: "Terser dev alt to the 235b — evaluated for higher answer-yield (235b answered=0.63 @8k)."
   qwen3_5_122b:
     id: openrouter/qwen/qwen3.5-122b-a10b            # Qwen 3.5 MoE (122B-A10B); OpenRouter catalog 2026-06-26
-    provider: novita/bf16                            # bf16 endpoint (project pref bf16>fp8); alts: alibaba, siliconflow/fp8, atlas-cloud/fp8
+    provider: siliconflow/fp8                        # REPINNED 2026-06-27: novita/bf16 WEDGES under sustained load (hung requests, 0% CPU, ~19h sweep); alibaba is fast but does NOT honor prefill (no-CoT arm breaks); siliconflow/fp8 honors prefill ✅ + stable (8/8 concurrent ok). Model fills the 8k cap (~137s/gen), so use high --concurrency + --attempt-timeout.
     cot_access: native_raw                            # PROVISIONAL — endpoint exposes reasoning/include_reasoning; CONFIRM via probe
     reasoning_enabled: true
     tier: faithful_hints_gradient
     necessity: todo                                   # NOT load-bearing until Phase-0 verifies (CLAUDE.md guardrail)
     uplift_set: null
     experiments: [hints, gradient, oversight, followup_a]   # WIRED for all experiments; run phase0_qwen3_5.py BEFORE the sweep
-    notes: "Qwen 3.5 successor to qwen3-235b-thinking. PHASE-0 PROBE REQUIRED before trusting as load-bearing (scripts/phase0_qwen3_5.py): (1) raw faithful reasoning exposure (reasoning field, not summary), (2) prefill works for the no-CoT arm, (3) per-model necessity (forbidden-vs-allowed uplift), (4) confirm/repin provider+quant. necessity stays `todo` and results carry a provisional caveat until the probe passes."
+    notes: "Qwen 3.5 successor to qwen3-235b-thinking. DROPPED from the OpenRouter §3.1 analysis 2026-06-28 (Arav): probe PASSED (raw ✅ + prefill ✅; necessity +0.17 one-shots = provisional) but the powered sweep is INFEASIBLE on OpenRouter — every endpoint (novita/bf16 crashed, siliconflow/fp8 wedged) hangs its 8k-token gens under sustained load (~137s/gen, ~19h projected; sweep reached 40/47 then stalled). --attempt-timeout prevents a terminal wedge but not the slowness. DEFERRED → self-hosted vLLM (see selfhost_vllm/ — gives reliable prefill + reasoning exposure + thinking-toggle + any size; ideal for the Follow-up C qwen DENSE scale ladder 1.7B→32B). Re-enable as a self-host actor once the vLLM endpoint is up; not in the committed 8-actor set."
   kimi_k2_thinking:                                  # Moonshot — independent faithful family (cross-lab robustness)
     id: openrouter/moonshotai/kimi-k2-thinking       # Kimi K2 Thinking (~1T MoE); OpenRouter catalog 2026-06-26
     provider: novita/bf16                            # bf16 endpoint (project pref bf16>fp8>int4); alts: atlas-cloud/int4, google-vertex
@@ -77,7 +77,17 @@ actors:
     necessity: todo                                   # NOT load-bearing until Phase-0 verifies (CLAUDE.md guardrail)
     uplift_set: null
     experiments: [hints, gradient, oversight, followup_a]   # WIRED for all experiments; run phase0_kimi_k2.py BEFORE the sweep
-    notes: "Kimi K2 Thinking (Moonshot, ~1T MoE) — adds an independent lab family to a Google/OpenAI/Qwen-heavy roster (cross-family robustness, CLAUDE.md). PHASE-0 PROBE REQUIRED (scripts/phase0_kimi_k2.py): (1) raw faithful reasoning exposure (reasoning field, not summary), (2) prefill works for the no-CoT arm, (3) per-model necessity, (4) confirm/repin provider+quant. cot_access=native_raw is provisional until the probe passes."
+    notes: "Kimi K2 Thinking (Moonshot, ~1T MoE) — adds an independent lab family to a Google/OpenAI/Qwen-heavy roster (cross-family robustness, CLAUDE.md). DEFERRED 2026-06-26 (user): ~1T MoE too slow on novita for this sweep — superseded by deepseek_v4_flash (same independent-lab role, fast 'flash' MoE). Probe plumbing PASSED (raw ✅ + prefill ✅ at n=1) but excluded from the Steps 4–5 sweep. PHASE-0 PROBE (scripts/phase0_kimi_k2.py): (1) raw faithful reasoning exposure (reasoning field, not summary), (2) prefill works for the no-CoT arm, (3) per-model necessity, (4) confirm/repin provider+quant. cot_access=native_raw is provisional until the probe passes."
+  deepseek_v4_flash:                                 # DeepSeek — independent lab family (replaces slow kimi_k2_thinking)
+    id: openrouter/deepseek/deepseek-v4-flash        # DeepSeek V4 Flash (MoE); OpenRouter catalog 2026-06-26 (18 endpoints, all expose `reasoning`)
+    provider: novita/fp8                             # NO bf16 endpoint exists; fp8 = best available (project pref bf16>fp8>fp4); alts: gmicloud/fp8, baidu/fp8 (cheaper $0.10/$0.20), wandb/fp8, siliconflow/fp8
+    cot_access: native_raw                            # PROVISIONAL — all endpoints advertise reasoning/include_reasoning; CONFIRM RAW (not summary) via probe
+    reasoning_enabled: true
+    tier: faithful_hints_gradient
+    necessity: todo                                   # NOT load-bearing until Phase-0 verifies (CLAUDE.md guardrail)
+    uplift_set: null
+    experiments: [hints, gradient, oversight, followup_a]   # WIRED for all experiments; run phase0_deepseek_v4_flash.py BEFORE the sweep
+    notes: "DeepSeek V4 Flash — added 2026-06-26 (user) as a fast replacement for the slow ~1T kimi_k2_thinking; same independent-lab cross-family-robustness role (CLAUDE.md), but a 'flash' MoE. PHASE-0 PROBE REQUIRED (scripts/phase0_deepseek_v4_flash.py): (1) raw faithful reasoning exposure (reasoning field, not summary), (2) prefill works for the no-CoT arm, (3) per-model necessity, (4) confirm/repin provider+quant. cot_access=native_raw is provisional until the probe passes."
   gpt_oss_120b:
     id: openrouter/openai/gpt-oss-120b
     provider: deepinfra/bf16                        # model has fp4..fp16 endpoints; pin bf16
@@ -135,12 +145,13 @@ actors:
     id: openrouter/google/gemini-3.5-flash
     provider: google-vertex
     cot_access: disabled
-    reasoning_enabled: false                        # disable hidden channel -> reasons in body, which we judge (like gemini_3_flash)
+    reasoning_enabled: null                         # omit reasoning.enabled (enabled:false 400s — mandatory channel)
+    reasoning_effort: minimal                       # THE disable: reasoning.effort=minimal -> rtoks=0, reasons in body we judge (verified 2026-06-26, both google-vertex + ai-studio; enabled:false & max_tokens:0 both 400)
     tier: faithful_hints_gradient
     necessity: todo                                 # PHASE-0 PROBE REQUIRED (disable works + per-model uplift)
     uplift_set: null
     experiments: [hints, gradient, oversight, followup_a]   # WIRED for all experiments; run phase0_gemini_3_5_flash.py BEFORE the sweep
-    notes: "Flash-lineage ladder TOP (2.5 -> 3-flash -> 3.5-flash) for the Follow-up C scale-erosion story; ALSO the §4.4 summarizer (monitors.gemini_3_5_flash_monitor). PHASE-0 PROBE REQUIRED before load-bearing (scripts/phase0_gemini_3_5_flash.py): confirm reasoning:{enabled:false} disables to body CoT (rtoks=0) AND per-model necessity (forbidden-vs-allowed uplift). necessity stays `todo` until the probe passes."
+    notes: "Flash-lineage ladder TOP (2.5 -> 3-flash -> 3.5-flash) for the Follow-up C scale-erosion story; ALSO the §4.4 summarizer (monitors.gemini_3_5_flash_monitor). DISABLE RESOLVED 2026-06-26: reasoning:{enabled:false} and {max_tokens:0} BOTH 400 ('Reasoning is mandatory'), but reasoning:{effort:minimal} genuinely disables (rtoks=0, reasons in body — like gemini_3_flash) on BOTH google-vertex + google-ai-studio. Clean CONTRAST with gemini_3_1_pro, where effort:minimal only REDUCES (rtoks 156-242, never 0) -> Pro tier stays mandatory-hidden. The phase0 probe (scripts/phase0_gemini_3_5_flash.py) builds from the roster, so it now uses effort:minimal automatically; it confirms rtoks=0 + prefill + per-model necessity. necessity stays `todo` until it passes."
 
   # ── Generalization-only (mandatory hidden reasoning — faithfulness UNVERIFIABLE; caveated) ──
   gemini_2_5_pro:                                   # REPLICATION ANCHOR
@@ -156,13 +167,13 @@ actors:
   gemini_3_1_pro:
     id: openrouter/google/gemini-3.1-pro-preview
     provider: google-vertex
-    cot_access: summary
-    reasoning_enabled: null                         # phase0: reasoning MANDATORY, cannot disable
+    cot_access: body_channel                        # judge the VISIBLE body (it reasons step-by-step there, ~2k chars on GPQA); caveated — it ALSO reasons hidden
+    reasoning_enabled: null                         # reasoning MANDATORY (enabled:false/max_tokens:0 400); effort:minimal only REDUCES (rtoks 156-242, NEVER 0 on either provider, 2026-06-26) -> cannot disable
     tier: generalization_only
     necessity: na
     uplift_set: null
     experiments: [hints, gradient, oversight]
-    notes: "Strong Gemini 3.x; reasoning MANDATORY (cannot disable) -> generalization-only."
+    notes: "Strong Gemini 3.x. reasoning MANDATORY: unlike gemini_3_5_flash (effort:minimal -> rtoks=0), Pro stays >0 (156-242) at minimal -> hidden channel UNDISABLEABLE -> generalization_only. HEADLINE = caveated datapoint: we judge the visible body CoT (cot_access=body_channel), NOT a faithful hidden trace (like the gemini_2_5_pro anchor). Do not present as a faithful-actor headline."
 
 monitors:
   gemini_3_5_flash_monitor:   # weak monitor; ALSO the §4.4 summarizer (renamed from gemini_3_5_flash so the
