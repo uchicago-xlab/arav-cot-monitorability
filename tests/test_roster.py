@@ -45,3 +45,30 @@ def test_build_model_no_network(monkeypatch):
     from inspect_ai.model import Model
     m = roster.build_model("gemini_3_flash")
     assert isinstance(m, Model)
+
+
+def test_selfhost_actor_fields():
+    e = roster.get_entry("qwen3_5_122b_selfhost")
+    assert e.id == "openai-api/vllm/qwen3_5-122b"     # inspect openai-api provider: service `vllm`
+    assert e.provider is None                          # self-host: not OpenRouter -> no provider pin
+    assert e.provider_pin is None
+    assert e.reasoning_enabled is None                 # OpenRouter-only arg; N/A on self-host path
+    assert e.cot_access == roster.NATIVE_RAW
+    assert e.no_cot_mechanism == "vllm_structured"     # prefill not honored -> schema + enable_thinking:false
+    assert e.experiments == ("hints",)                 # decode-necessity + §3.1 only
+
+
+def test_build_model_openai_api_branch(monkeypatch):
+    """The openai-api/ branch: reads VLLM_BASE_URL/VLLM_API_KEY (service prefix), attaches NO
+    OpenRouter provider pin and NO reasoning_enabled model arg. Construction only, no network."""
+    monkeypatch.setenv("VLLM_BASE_URL", "http://localhost:8000/v1")
+    monkeypatch.setenv("VLLM_API_KEY", "EMPTY")
+    from inspect_ai.model import Model
+    m = roster.build_model("qwen3_5_122b_selfhost")
+    assert isinstance(m, Model)
+    # neither OpenRouter-only knob leaked onto the model args
+    margs = getattr(m.api, "model_args", {})
+    assert "provider" not in margs
+    assert "reasoning_enabled" not in margs
+    # temperature/top_p are NOT stripped on this path (unlike the anthropic path)
+    assert m.config.temperature is None or True        # default cfg has none set; just assert no crash

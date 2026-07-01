@@ -119,7 +119,8 @@ async def run_actor(name, args, reuse):
     print(f"  {'cell':18} {'with-CoT':>9} {'no-CoT':>8} {'uplift':>8} {'2σ CI':>16}  verdict   src")
 
     rows, captures, stats = [], [], {"in_tok": 0, "out_tok": 0, "n_gen": 0}
-    sampler = decode.make_sampler(model, capture=captures, stats=stats, cot_source=cot_source)
+    sampler = decode.make_sampler(model, capture=captures, stats=stats, cot_source=cot_source,
+                                  no_cot_mechanism=entry.no_cot_mechanism)  # prefill, or vllm_structured (self-host qwen3.5)
     t0 = time.monotonic()
     for family in args.families:
         for level in args.levels:

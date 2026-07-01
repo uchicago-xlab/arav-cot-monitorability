@@ -66,7 +66,9 @@ class RosterEntry:
     uplift_set: str | None
     experiments: tuple[str, ...] = ()
     roles: tuple[str, ...] = ()
-    no_cot_mechanism: str = "prefill"  # "prefill" | "structured_output" (prefill-rejecting actors)
+    no_cot_mechanism: str = "prefill"  # "prefill" | "structured_output" | "vllm_structured"
+    #   (prefill-rejecting actors: Opus 4.8 -> structured_output; self-host vLLM qwen3.5 ->
+    #   vllm_structured = single-letter schema + chat_template_kwargs enable_thinking:false)
     reasoning_effort: str | None = None  # OpenRouter reasoning.effort (minimal/low/...); the ONLY
     #   hidden-channel disable for mandatory-reasoning Flash models (e.g. gemini-3.5-flash:
     #   effort=minimal -> rtoks=0, reasons in body; enabled:false/max_tokens:0 both 400).
@@ -153,6 +155,16 @@ def build_model(
     """
     e = get_entry(name, path=path)
     cfg = config or GenerateConfig()
+    if e.id.startswith("openai-api/"):
+        # Self-hosted vLLM (OpenAI-compatible endpoint) via inspect's `openai-api` provider: it reads
+        # <PREFIX>_BASE_URL / <PREFIX>_API_KEY from env off the id's service segment (id
+        # openai-api/vllm/<model> -> service `vllm` -> VLLM_BASE_URL + VLLM_API_KEY). The OpenRouter-only
+        # knobs do NOT apply here: no `provider` routing pin and no `reasoning_enabled` model arg (both
+        # are OpenRouter extra_body maps). Keep temperature/top_p as-is (not the anthropic strip path).
+        # The vLLM thinking toggle / structured no-CoT arm rides on GenerateConfig.extra_body at generate
+        # time (see exp_hints/solver.py NO_COT_VLLM_STRUCTURED), not on a model arg here.
+        margs: dict[str, Any] = dict(extra_model_args)
+        return get_model(e.id, config=cfg, **margs)
     if e.id.startswith("anthropic/"):
         # Opus 4.8 (and the 4.6+/Fable family) REJECT temperature/top_p/top_k with a 400 — strip
         # them on the native anthropic path (the sweep sets temperature=0.7). reasoning_enabled is an

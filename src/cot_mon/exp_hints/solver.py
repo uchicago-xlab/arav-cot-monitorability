@@ -40,8 +40,20 @@ HINT_KINDS = ("none", "simple", "complex")
 #                        is no room to externalise reasoning. Enforced server-side, not by instruction.
 #                        NB: a DIFFERENT mechanism than prefill → its uplift carries a comparability
 #                        footnote vs the prefill actors (SPEC necessity is mechanism-sensitive).
+#   "vllm_structured"    for the self-hosted vLLM qwen3.5 actor, which ALSO rejects assistant prefill
+#                        (continue_final_message returns empty). Same single-letter enum schema as
+#                        "structured_output" PLUS the vLLM thinking disable
+#                        extra_body={"chat_template_kwargs": {"enable_thinking": False}} — structured
+#                        output alone still lets the model reason in the `reasoning` channel, so the
+#                        enable_thinking:false kwarg is what makes it a TRUE no-CoT arm (verified live
+#                        against vLLM 0.24.0; the kwarg must be `enable_thinking`, not `thinking`).
 NO_COT_PREFILL = "prefill"
 NO_COT_STRUCTURED = "structured_output"
+NO_COT_VLLM_STRUCTURED = "vllm_structured"
+
+# vLLM thinking-disable extra_body (chat_template_kwargs) — forwarded via GenerateConfig.extra_body,
+# which inspect's openai-api provider passes straight to the OpenAI-compatible request body.
+_VLLM_THINKING_OFF = {"chat_template_kwargs": {"enable_thinking": False}}
 
 
 async def _bounded_gather(coros, limit: int):
@@ -125,7 +137,13 @@ def _real_reasoning_text(s: str) -> str:
 def extract_reasoning(output) -> str:
     """The raw reasoning trace from an Inspect output's ContentReasoning block(s). native_raw actors
     (open weights via OpenRouter) emit their CoT here, SEPARATE from `.completion`; `''` if none.
-    Text-less signature artifacts from a disabled channel are dropped (see _real_reasoning_text)."""
+    Text-less signature artifacts from a disabled channel are dropped (see _real_reasoning_text).
+
+    NEEDS ON-POD VERIFICATION (self-host vLLM qwen3.5): the live endpoint returns the CoT in the
+    OpenAI `reasoning` message field (not `reasoning_content`). Whether inspect's `openai-api`
+    provider surfaces that `reasoning` field as a ContentReasoning block (so this reader picks it up
+    unchanged) has NOT been confirmed against the endpoint. If it does not, the vLLM `reasoning`
+    field must be mapped into a ContentReasoning block before this function is reached."""
     msg = getattr(output, "message", None)
     content = getattr(msg, "content", None) if msg is not None else None
     if isinstance(content, list):
@@ -204,15 +222,22 @@ async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_sourc
     body_channel/disabled actors (CoT in `.completion`). The ANSWER is always parsed from the body.
     The with-CoT arm NEVER prefills (so a thinking model's trace is not truncated). The no-CoT
     necessity arm forces an immediate answer via `no_cot_mechanism`: "prefill" (default — prefill
-    `<answer>`) or "structured_output" (a single-letter enum schema, for actors that 400 on prefill
-    such as Opus 4.8)."""
+    `<answer>`), "structured_output" (a single-letter enum schema, for actors that 400 on prefill
+    such as Opus 4.8), or "vllm_structured" (that same schema PLUS the vLLM enable_thinking:false
+    disable, for the self-hosted qwen3.5 actor, which also rejects prefill)."""
     prompt = build_prompt(item, hint, with_cot=with_cot)
-    structured = (not with_cot) and no_cot_mechanism == NO_COT_STRUCTURED
+    # both structured mechanisms constrain the output to a single-letter schema (no room for CoT);
+    # vllm_structured ALSO disables the vLLM thinking channel so the `reasoning` field is empty too.
+    structured = (not with_cot) and no_cot_mechanism in (NO_COT_STRUCTURED, NO_COT_VLLM_STRUCTURED)
+    vllm_no_think = (not with_cot) and no_cot_mechanism == NO_COT_VLLM_STRUCTURED
     if with_cot:
         out = await model.generate(prompt)
         body = out.completion
     elif structured:                        # forced no-CoT WITHOUT prefill: constrain to one letter
-        out = await model.generate(prompt, config=GenerateConfig(response_schema=_letter_schema(item)))
+        cfg = GenerateConfig(response_schema=_letter_schema(item))
+        if vllm_no_think:                   # + disable the vLLM `reasoning` channel (chat_template_kwargs)
+            cfg = cfg.model_copy(update={"extra_body": _VLLM_THINKING_OFF})
+        out = await model.generate(prompt, config=cfg)
         body = out.completion
     else:                                   # force early answer: prefill the assistant turn
         out = await model.generate([ChatMessageUser(content=prompt), ChatMessageAssistant(content="<answer>")])
