@@ -1,0 +1,156 @@
+{
+  "gemini_2_5_flash": {
+    "bignum": {
+      "unfaithful": 0.032,
+      "follow": 0.236,
+      "necessity": 0.851
+    },
+    "iterated": {
+      "unfaithful": 0.007,
+      "follow": 0.072,
+      "necessity": 0.549
+    },
+    "deductive": {
+      "unfaithful": 0.005,
+      "follow": 0.044,
+      "necessity": -0.037
+    },
+    "indirection": {
+      "unfaithful": 0.012,
+      "follow": 0.085,
+      "necessity": 0.744
+    }
+  },
+  "gemini_3_flash": {
+    "bignum": {
+      "unfaithful": 0.0,
+      "follow": 0.728,
+      "necessity": 0.843
+    },
+    "iterated": {
+      "unfaithful": 0.011,
+      "follow": 0.242,
+      "necessity": 0.735
+    },
+    "deductive": {
+      "unfaithful": 0.028,
+      "follow": 0.577,
+      "necessity": 0.0
+    },
+    "indirection": {
+      "unfaithful": 0.0,
+      "follow": 0.182,
+      "necessity": 0.724
+    }
+  },
+  "gemini_3_5_flash": {
+    "bignum": {
+      "unfaithful": 0.0,
+      "follow": 0.867,
+      "necessity": 0.757
+    },
+    "iterated": {
+      "unfaithful": 0.0,
+      "follow": 0.424,
+      "necessity": 0.347
+    },
+    "deductive": {
+      "unfaithful": 0.0,
+      "follow": 0.749,
+      "necessity": 0.007
+    },
+    "indirection": {
+      "unfaithful": 0.0,
+      "follow": 0.262,
+      "necessity": 0.688
+    }
+  },
+  "gpt_5_5": {
+    "bignum": {
+      "unfaithful": 0.286,
+      "follow": 0.587,
+      "necessity": 0.524
+    },
+    "iterated": {
+      "unfaithful": 0.092,
+      "follow": 0.264,
+      "necessity": 0.679
+    },
+    "deductive": {
+      "unfaithful": 0.008,
+      "follow": 0.292,
+      "necessity": 0.074
+    },
+    "indirection": {
+      "unfaithful": 0.055,
+      "follow": 0.199,
+      "necessity": 0.817
+    }
+  },
+  "opus_4_8_direct": {
+    "bignum": {
+      "unfaithful": 0.215,
+      "follow": 0.91,
+      "necessity": 0.083
+    },
+    "iterated": {
+      "unfaithful": 0.224,
+      "follow": 0.81,
+      "necessity": 0.802
+    },
+    "deductive": {
+      "unfaithful": 0.031,
+      "follow": 0.775,
+      "necessity": 0.0
+    },
+    "indirection": {
+      "unfaithful": 0.0,
+      "follow": 0.555,
+      "necessity": 0.746
+    }
+  },
+  "gpt_oss_120b": {
+    "bignum": {
+      "unfaithful": 0.055,
+      "follow": 0.768,
+      "necessity": 0.0
+    },
+    "iterated": {
+      "unfaithful": 0.0,
+      "follow": 0.046,
+      "necessity": -0.293
+    },
+    "deductive": {
+      "unfaithful": 0.025,
+      "follow": 0.322,
+      "necessity": -0.003
+    },
+    "indirection": {
+      "unfaithful": 0.003,
+      "follow": 0.046,
+      "necessity": 0.0
+    }
+  },
+  "deepseek_v4_flash": {
+    "bignum": {
+      "unfaithful": 0.062,
+      "follow": 0.222,
+      "necessity": 0.0
+    },
+    "iterated": {
+      "unfaithful": 0.025,
+      "follow": 0.047,
+      "necessity": 0.0
+    },
+    "deductive": {
+      "unfaithful": 0.04,
+      "follow": 0.165,
+      "necessity": -0.007
+    },
+    "indirection": {
+      "unfaithful": 0.012,
+      "follow": 0.052,
+      "necessity": 0.0
+    }
+  }
+}
