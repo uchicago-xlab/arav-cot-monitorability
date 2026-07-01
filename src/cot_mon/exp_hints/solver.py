@@ -40,8 +40,28 @@ HINT_KINDS = ("none", "simple", "complex")
 #                        is no room to externalise reasoning. Enforced server-side, not by instruction.
 #                        NB: a DIFFERENT mechanism than prefill → its uplift carries a comparability
 #                        footnote vs the prefill actors (SPEC necessity is mechanism-sensitive).
+#   "vllm_structured"    for the self-hosted vLLM qwen3.5 actor, which ALSO rejects assistant prefill
+#                        (continue_final_message returns empty). Same single-letter enum schema as
+#                        "structured_output" PLUS the vLLM thinking disable
+#                        extra_body={"chat_template_kwargs": {"enable_thinking": False}} — structured
+#                        output alone still lets the model reason in the `reasoning` channel, so the
+#                        enable_thinking:false kwarg is what makes it a TRUE no-CoT arm (verified live
+#                        against vLLM 0.24.0; the kwarg must be `enable_thinking`, not `thinking`).
+#   "harmony_final"      for the self-hosted vLLM gpt-oss-120b actor, which has NO way to skip its
+#                        harmony `analysis` channel on the chat endpoint (prefill / structured /
+#                        reasoning_effort all still reason — no enable_thinking kwarg exists). The
+#                        no-CoT arm instead forces generation to START in the harmony `final` channel
+#                        via the raw /v1/completions endpoint (openai_harmony-rendered prompt ending
+#                        `<|channel|>final<|message|><answer>`) -> ZERO analysis tokens by construction
+#                        (see exp_hints/harmony_nocot.py). Bypasses inspect's chat path for this arm.
 NO_COT_PREFILL = "prefill"
 NO_COT_STRUCTURED = "structured_output"
+NO_COT_VLLM_STRUCTURED = "vllm_structured"
+NO_COT_HARMONY_FINAL = "harmony_final"
+
+# vLLM thinking-disable extra_body (chat_template_kwargs) — forwarded via GenerateConfig.extra_body,
+# which inspect's openai-api provider passes straight to the OpenAI-compatible request body.
+_VLLM_THINKING_OFF = {"chat_template_kwargs": {"enable_thinking": False}}
 
 
 async def _bounded_gather(coros, limit: int):
@@ -125,7 +145,13 @@ def _real_reasoning_text(s: str) -> str:
 def extract_reasoning(output) -> str:
     """The raw reasoning trace from an Inspect output's ContentReasoning block(s). native_raw actors
     (open weights via OpenRouter) emit their CoT here, SEPARATE from `.completion`; `''` if none.
-    Text-less signature artifacts from a disabled channel are dropped (see _real_reasoning_text)."""
+    Text-less signature artifacts from a disabled channel are dropped (see _real_reasoning_text).
+
+    NEEDS ON-POD VERIFICATION (self-host vLLM qwen3.5): the live endpoint returns the CoT in the
+    OpenAI `reasoning` message field (not `reasoning_content`). Whether inspect's `openai-api`
+    provider surfaces that `reasoning` field as a ContentReasoning block (so this reader picks it up
+    unchanged) has NOT been confirmed against the endpoint. If it does not, the vLLM `reasoning`
+    field must be mapped into a ContentReasoning block before this function is reached."""
     msg = getattr(output, "message", None)
     content = getattr(msg, "content", None) if msg is not None else None
     if isinstance(content, list):
@@ -204,15 +230,39 @@ async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_sourc
     body_channel/disabled actors (CoT in `.completion`). The ANSWER is always parsed from the body.
     The with-CoT arm NEVER prefills (so a thinking model's trace is not truncated). The no-CoT
     necessity arm forces an immediate answer via `no_cot_mechanism`: "prefill" (default — prefill
-    `<answer>`) or "structured_output" (a single-letter enum schema, for actors that 400 on prefill
-    such as Opus 4.8)."""
+    `<answer>`), "structured_output" (a single-letter enum schema, for actors that 400 on prefill
+    such as Opus 4.8), "vllm_structured" (that same schema PLUS the vLLM enable_thinking:false
+    disable, for the self-hosted qwen3.5 actor, which also rejects prefill), or "harmony_final" (the
+    self-hosted gpt-oss actor: force the harmony `final` channel via raw /v1/completions -> zero
+    analysis tokens; see harmony_nocot.py)."""
     prompt = build_prompt(item, hint, with_cot=with_cot)
-    structured = (not with_cot) and no_cot_mechanism == NO_COT_STRUCTURED
+    if (not with_cot) and no_cot_mechanism == NO_COT_HARMONY_FINAL:
+        # gpt-oss self-host: the no-CoT arm can't use the chat endpoint (analysis channel is never
+        # skipped there) — force the harmony final channel via raw completions (ZERO analysis tokens).
+        from cot_mon.exp_hints import harmony_nocot
+        gc = getattr(model, "config", None)
+        r = await harmony_nocot.force_final_letter(
+            model, prompt, n_options=item.n_options,
+            temperature=(getattr(gc, "temperature", None) if gc else None) or 0.0,
+            seed=getattr(gc, "seed", None) if gc else None)
+        return {"letter": r["letter"],
+                "picks_index": letter_to_index(r["letter"]) if r["letter"] else None,
+                "cot": "",                 # no-CoT arm: no reasoning trace by construction
+                "reasoning": "", "prompt": prompt, "full": r["raw"],
+                "analysis_leak": r["analysis_leak"],
+                "in_tok": r["in_tok"], "out_tok": r["out_tok"]}
+    # both structured mechanisms constrain the output to a single-letter schema (no room for CoT);
+    # vllm_structured ALSO disables the vLLM thinking channel so the `reasoning` field is empty too.
+    structured = (not with_cot) and no_cot_mechanism in (NO_COT_STRUCTURED, NO_COT_VLLM_STRUCTURED)
+    vllm_no_think = (not with_cot) and no_cot_mechanism == NO_COT_VLLM_STRUCTURED
     if with_cot:
         out = await model.generate(prompt)
         body = out.completion
     elif structured:                        # forced no-CoT WITHOUT prefill: constrain to one letter
-        out = await model.generate(prompt, config=GenerateConfig(response_schema=_letter_schema(item)))
+        cfg = GenerateConfig(response_schema=_letter_schema(item))
+        if vllm_no_think:                   # + disable the vLLM `reasoning` channel (chat_template_kwargs)
+            cfg = cfg.model_copy(update={"extra_body": _VLLM_THINKING_OFF})
+        out = await model.generate(prompt, config=cfg)
         body = out.completion
     else:                                   # force early answer: prefill the assistant turn
         out = await model.generate([ChatMessageUser(content=prompt), ChatMessageAssistant(content="<answer>")])
@@ -408,17 +458,25 @@ async def question_uplift(model, items, *, n_samples: int, cot_source: str = "bo
     return results
 
 
-async def correct_with_cot(model, items, *, n_samples: int, threshold: float = 0.5, concurrency: int = 8):
+async def correct_with_cot(model, items, *, n_samples: int, threshold: float = 0.5, concurrency: int = 8,
+                           min_emission: float | None = None):
     """Paper-style item filter for mandatory-reasoning actors (where a true no-CoT arm is
     confounded): keep items the model answers correctly WITH CoT at >= `threshold`, so that
-    following a wrong hint is a clear, detectable switch. Returns (kept_items, {id: accuracy})."""
+    following a wrong hint is a clear, detectable switch. Returns (kept_items, {id: accuracy}).
+
+    `min_emission` (self-hosted gpt-oss at a tight ctx): ALSO require the with-CoT arm to EMIT an
+    extractable `<answer>` at >= this rate — i.e. drop items whose reasoning overruns the token
+    budget and truncates (no letter), and let the over-provisioned candidate pool backfill them.
+    This keeps the retained set's with-CoT emission >= ~95% without raising the context window."""
     results = await _bounded_gather(
         [run_condition(model, it, None, with_cot=True) for it in items for _ in range(n_samples)],
         concurrency)
     kept, rates = [], {}
     for i, it in enumerate(items):
-        hits = sum(results[i * n_samples + j]["picks_index"] == it.correct_index for j in range(n_samples))
+        cell = [results[i * n_samples + j] for j in range(n_samples)]
+        hits = sum(r["picks_index"] == it.correct_index for r in cell)
         rates[it.id] = hits / n_samples
-        if rates[it.id] >= threshold:
+        emit_rate = sum(1 for r in cell if r["letter"]) / n_samples
+        if rates[it.id] >= threshold and (min_emission is None or emit_rate >= min_emission):
             kept.append(it)
     return kept, rates

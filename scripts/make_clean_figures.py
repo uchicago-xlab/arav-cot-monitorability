@@ -49,6 +49,15 @@ def disp(actor: str) -> str:
     return mf.LABEL.get(actor, actor.replace("_", "-")).split("\n")[0].split(" (")[0]
 
 
+# The DECODE figs (figC1/figC2) show BOTH gpt-oss rows — the provider-suspect OpenRouter one and the
+# faithful self-host one — so they MUST keep the OR/vLLM tag to be distinguishable (disp() strips it).
+_DECODE_LABEL = {"gpt_oss_120b": "gpt-oss-120b (OR)", "gpt_oss_120b_selfhost": "gpt-oss-120b (vLLM)"}
+
+
+def ddisp(actor: str) -> str:
+    return _DECODE_LABEL.get(actor, disp(actor))
+
+
 # ── 1. HEADLINE (Gate 1) — recomputed from transcripts so all judgeable actors appear ─────────────
 def fig1_headline() -> Path:
     rows = []
@@ -230,7 +239,7 @@ def fig5_concealment() -> Path:
 
 # ── C1. DECODE-UPLIFT by family (clean horizontal small-multiples) ────────────────────────────────
 DECODE_ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",
-                "gpt_oss_120b", "deepseek_v4_flash", "qwen3_5_122b"]
+                "gpt_oss_120b", "gpt_oss_120b_selfhost", "deepseek_v4_flash", "qwen3_5_122b"]
 
 
 def _decode_cells() -> dict:
@@ -268,7 +277,7 @@ def figC1_decode_uplift_by_family(cells: dict) -> Path:
         ax.grid(axis="x"); ax.grid(axis="y", visible=False)
         if j > 0:
             ax.tick_params(left=False)
-    axes[0].set_yticks(y); axes[0].set_yticklabels([disp(a) for a in actors])
+    axes[0].set_yticks(y); axes[0].set_yticklabels([ddisp(a) for a in actors])
     cp.title(fig, "Which decodes force externalization (L1)",
              "decode accuracy with-CoT − no-CoT · dashed = +0.5 necessity threshold")
     return cp.finalize(fig, OUT / "figC1_decode_uplift_by_family.png")
@@ -297,7 +306,7 @@ def figC2_necessity_heatmap(cells: dict) -> Path:
                 txt = "—" if c is None else (f"{c['up']:+.2f}\n{g}" if g else f"{c['up']:+.2f}")
                 ax.text(li, ai, txt, ha="center", va="center", fontsize=7.5,
                         color="#999" if c is None else cp.SLATE)
-    axes[0].set_yticks(range(len(actors))); axes[0].set_yticklabels([disp(a) for a in actors])
+    axes[0].set_yticks(range(len(actors))); axes[0].set_yticklabels([ddisp(a) for a in actors])
     cp.title(fig, "Necessity map — uplift by model × level",
              "color = uplift (red low to green high) · green = CoT-necessary · 1 one-shot · × too-hard · ~ weak")
     return cp.finalize(fig, OUT / "figC2_necessity_heatmap.png")

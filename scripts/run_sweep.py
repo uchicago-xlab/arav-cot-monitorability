@@ -86,7 +86,8 @@ async def run_actor(name, args):
         rates = {}
     else:
         kept, rates = await solver.correct_with_cot(model, items, n_samples=args.filter_samples,
-                                                    threshold=args.min_correct, concurrency=args.concurrency)
+                                                    threshold=args.min_correct, concurrency=args.concurrency,
+                                                    min_emission=args.min_emission)
         kept = kept[:args.n_items]
     print(f"  [{name}] filter: kept {len(kept)}/{len(items)} (correct-with-CoT >= {args.min_correct})", flush=True)
     if not kept:
@@ -249,6 +250,10 @@ if __name__ == "__main__":
     ap.add_argument("--candidates", type=int, default=120, help="items loaded before the correct-with-CoT filter")
     ap.add_argument("--filter-samples", type=int, default=4)
     ap.add_argument("--min-correct", type=float, default=0.5)
+    ap.add_argument("--min-emission", type=float, default=None,
+                    help="also require the with-CoT arm to emit an extractable <answer> at >= this "
+                         "rate in the filter (drops items that truncate before answering; for the "
+                         "self-host gpt-oss actor at a tight ctx — over-provision --candidates to backfill).")
     ap.add_argument("--temperature", type=float, default=0.7)
     ap.add_argument("--max-tokens", type=int, default=2048)
     ap.add_argument("--reasoning-floor", type=int, default=8000,
