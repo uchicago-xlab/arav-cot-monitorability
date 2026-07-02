@@ -114,12 +114,17 @@ async def run_actor(name, args, reuse):
     model = roster.build_model(name, config=gc)
     print(f"\n=== {name} ({entry.cot_access}, cot_source={cot_source}, max_tokens={max_tokens}) ===", flush=True)
     if cot_source == "reasoning":
-        print(f"  NOTE {name}: native_raw — forced-no-CoT may not suppress the non-disableable reasoning "
-              f"channel; treat uplift as a conservative lower bound.")
-    print(f"  {'cell':18} {'with-CoT':>9} {'no-CoT':>8} {'uplift':>8} {'2σ CI':>16}  verdict   src")
+        if entry.no_cot_mechanism == decode.NO_COT_HARMONY_FINAL:
+            print(f"  NOTE {name}: no-CoT arm = harmony FINAL-channel force (zero analysis tokens, Gate 0) "
+                  f"→ uplift is a TRUE necessity measure, not a lower bound (unlike the OpenRouter native_raw path).")
+        else:
+            print(f"  NOTE {name}: native_raw — forced-no-CoT may not suppress the non-disableable reasoning "
+                  f"channel; treat uplift as a conservative lower bound.")
+    print(f"  {'cell':18} {'with-CoT':>9} {'no-CoT':>8} {'uplift':>8} {'2σ CI':>16}  verdict   src   emit(c/nc)")
 
     rows, captures, stats = [], [], {"in_tok": 0, "out_tok": 0, "n_gen": 0}
-    sampler = decode.make_sampler(model, capture=captures, stats=stats, cot_source=cot_source)
+    sampler = decode.make_sampler(model, capture=captures, stats=stats, cot_source=cot_source,
+                                  no_cot_mechanism=entry.no_cot_mechanism)  # prefill / vllm_structured / harmony_final
     t0 = time.monotonic()
     for family in args.families:
         for level in args.levels:
@@ -132,17 +137,26 @@ async def run_actor(name, args, reuse):
             else:
                 items, info = decode.decode_items(family, level, args.count,
                                                   random.Random(args.seed + level))
+                cap0 = len(captures)
                 res = await uf.measure(items, sampler, n_samples=args.n_samples,
                                        concurrency=args.concurrency)
                 n = len(res) * args.n_samples
                 k_cot = round(sum(r.pass_cot for r in res) * args.n_samples)
                 k_nocot = round(sum(r.pass_nocot for r in res) * args.n_samples)
                 row = _row(family, level, k_cot, n, k_nocot, n, "fresh")
+                # per-arm answer-EMISSION / truncation (proves a low uplift is genuine one-shot, not a
+                # truncated with-CoT arm; and the no-CoT arm's zero-analysis commit rate). From this
+                # cell's fresh captures (each Rollout carries the extracted letter + arm).
+                cell = captures[cap0:]
+                g_cot = sum(1 for c in cell if c.with_cot); g_noc = sum(1 for c in cell if not c.with_cot)
+                row["emit_cot"] = round(sum(1 for c in cell if c.with_cot and c.extracted) / g_cot, 3) if g_cot else None
+                row["emit_nocot"] = round(sum(1 for c in cell if (not c.with_cot) and c.extracted) / g_noc, 3) if g_noc else None
                 row["info"] = info
             rows.append(row)
             ci = f"[{row['uplift_lo']:+.2f},{row['uplift_hi']:+.2f}]"
+            emit = (f"{row.get('emit_cot')}/{row.get('emit_nocot')}" if row.get("emit_cot") is not None else "-")
             print(f"  {family + ' L' + str(level):18} {row['acc_cot']:>9.2f} {row['acc_nocot']:>8.2f} "
-                  f"{row['uplift']:>+8.2f} {ci:>16}  {row['necessity']:13} {row['source']}", flush=True)
+                  f"{row['uplift']:>+8.2f} {ci:>16}  {row['necessity']:13} {row['source']:6} {emit}", flush=True)
     wall = time.monotonic() - t0
     n_fresh = sum(1 for r in rows if r["source"] == "fresh")
     meta = {"actor": name, "cot_access": entry.cot_access, "cot_source": cot_source,

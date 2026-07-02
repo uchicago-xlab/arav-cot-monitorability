@@ -24,6 +24,7 @@ Log version + provider + mode + necessity per run (see `describe`).
 
 from __future__ import annotations
 
+import functools
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -51,6 +52,22 @@ DEFAULT_CONFIG = Path(os.environ.get("COT_MON_MODELS_CONFIG", _REPO_ROOT / "conf
 _UNSET = object()  # sentinel so callers can override reasoning_enabled to None explicitly
 
 
+@functools.lru_cache(maxsize=4)
+def _served_context() -> int:
+    """The self-host vLLM endpoint's max_model_len (for the max_tokens cap). One cached GET to
+    /v1/models; falls back to $VLLM_MAX_MODEL_LEN or 8192 if the endpoint is unreachable at build."""
+    import json
+    import urllib.request
+    try:
+        base = os.environ.get("VLLM_BASE_URL", "").rstrip("/")
+        key = os.environ.get("VLLM_API_KEY", "") or "x"
+        req = urllib.request.Request(base + "/models", headers={"Authorization": f"Bearer {key}"})
+        d = json.load(urllib.request.urlopen(req, timeout=10))
+        return int(d["data"][0].get("max_model_len") or 8192)
+    except Exception:
+        return int(os.environ.get("VLLM_MAX_MODEL_LEN", "8192"))
+
+
 @dataclass(frozen=True)
 class RosterEntry:
     """One model's resolved roster spec (pure data; no network)."""
@@ -66,7 +83,9 @@ class RosterEntry:
     uplift_set: str | None
     experiments: tuple[str, ...] = ()
     roles: tuple[str, ...] = ()
-    no_cot_mechanism: str = "prefill"  # "prefill" | "structured_output" (prefill-rejecting actors)
+    no_cot_mechanism: str = "prefill"  # "prefill" | "structured_output" | "vllm_structured"
+    #   (prefill-rejecting actors: Opus 4.8 -> structured_output; self-host vLLM qwen3.5 ->
+    #   vllm_structured = single-letter schema + chat_template_kwargs enable_thinking:false)
     reasoning_effort: str | None = None  # OpenRouter reasoning.effort (minimal/low/...); the ONLY
     #   hidden-channel disable for mandatory-reasoning Flash models (e.g. gemini-3.5-flash:
     #   effort=minimal -> rtoks=0, reasons in body; enabled:false/max_tokens:0 both 400).
@@ -153,6 +172,28 @@ def build_model(
     """
     e = get_entry(name, path=path)
     cfg = config or GenerateConfig()
+    if e.id.startswith("openai-api/"):
+        # Self-hosted vLLM (OpenAI-compatible endpoint) via inspect's `openai-api` provider: it reads
+        # <PREFIX>_BASE_URL / <PREFIX>_API_KEY from env off the id's service segment (id
+        # openai-api/vllm/<model> -> service `vllm` -> VLLM_BASE_URL + VLLM_API_KEY). The OpenRouter-only
+        # knobs do NOT apply here: no `provider` routing pin and no `reasoning_enabled` model arg (both
+        # are OpenRouter extra_body maps). Keep temperature/top_p as-is (not the anthropic strip path).
+        # The vLLM thinking toggle / structured no-CoT arm rides on GenerateConfig.extra_body at generate
+        # time (see exp_hints/solver.py NO_COT_VLLM_STRUCTURED), not on a model arg here.
+        margs: dict[str, Any] = dict(extra_model_args)
+        # Dedicated endpoint -> push concurrency: inspect defaults max_connections to 10, which would
+        # throttle the with-CoT arm below a big --concurrency. Let many requests be in flight (the
+        # script's semaphore is the real bound). Override via VLLM_MAX_CONNECTIONS.
+        if cfg.max_connections is None:
+            cfg = cfg.model_copy(update={"max_connections": int(os.environ.get("VLLM_MAX_CONNECTIONS", "256"))})
+        # Cap max_tokens to the served context window so prompt+max_tokens never 400s. gpt-oss
+        # over-reasons and the reasoning-floor (8000) would exceed an 8192 ctx. Auto-widens when the
+        # human raises --max-model-len. Reserve room for the prompt (VLLM_TOKENS_RESERVE).
+        if cfg.max_tokens:
+            cap = max(256, _served_context() - int(os.environ.get("VLLM_TOKENS_RESERVE", "2048")))
+            if cfg.max_tokens > cap:
+                cfg = cfg.model_copy(update={"max_tokens": cap})
+        return get_model(e.id, config=cfg, **margs)
     if e.id.startswith("anthropic/"):
         # Opus 4.8 (and the 4.6+/Fable family) REJECT temperature/top_p/top_k with a 400 — strip
         # them on the native anthropic path (the sweep sets temperature=0.7). reasoning_enabled is an

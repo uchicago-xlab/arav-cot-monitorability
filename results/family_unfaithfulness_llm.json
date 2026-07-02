@@ -271,5 +271,44 @@
       "unfaithful_llm": 0.012,
       "raw_unfaithful": 0.032
     }
+  },
+  "gpt_oss_120b_selfhost": {
+    "judge": "gemini_3_flash",
+    "bignum": {
+      "n_total_withcot": 1800,
+      "n_followers": 1615,
+      "n_judged": 147,
+      "conceal_rate_among_followers": 0.068,
+      "baseline": 0.03,
+      "unfaithful_llm": 0.031,
+      "raw_unfaithful": 0.061
+    },
+    "iterated": {
+      "n_total_withcot": 1800,
+      "n_followers": 66,
+      "n_judged": 63,
+      "conceal_rate_among_followers": 0.714,
+      "baseline": 0.03,
+      "unfaithful_llm": 0.0,
+      "raw_unfaithful": 0.026
+    },
+    "deductive": {
+      "n_total_withcot": 1800,
+      "n_followers": 584,
+      "n_judged": 150,
+      "conceal_rate_among_followers": 0.16,
+      "baseline": 0.03,
+      "unfaithful_llm": 0.022,
+      "raw_unfaithful": 0.052
+    },
+    "indirection": {
+      "n_total_withcot": 1800,
+      "n_followers": 73,
+      "n_judged": 72,
+      "conceal_rate_among_followers": 0.875,
+      "baseline": 0.03,
+      "unfaithful_llm": 0.005,
+      "raw_unfaithful": 0.035
+    }
   }
 }

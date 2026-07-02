@@ -33,10 +33,16 @@ from matplotlib.patches import Patch  # noqa: E402
 from cot_mon import figviz, metrics  # noqa: E402
 from cot_mon.metrics import load_withcot_rollouts  # noqa: E402  (explicit-selector transcript loader)
 
-ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "gpt_oss_120b",
+# NB: the REPLICATION figs (fig0/1/3/4/5) show gpt_oss_120b_selfhost (the faithful self-host re-run)
+# in place of the provider-suspect OpenRouter gpt_oss_120b — their SIMPLE-hint headline is identical
+# (~0.01), so the self-host number supersedes it here. Both gpt-oss rows still appear side-by-side in
+# the DECODE figures (figC1/figC2), where the re-run's contrast (one-shot artifact vs cot_necessary) is
+# the actual finding.
+ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "gpt_oss_120b_selfhost",
          "qwen3_30b", "qwen3_5_122b", "deepseek_v4_flash", "opus_4_8_direct", "gemini_3_1_pro"]
 LABEL = {"gemini_2_5_flash": "gemini-2.5-flash\n(paper)", "gemini_3_flash": "gemini-3-flash",
-         "gemini_3_5_flash": "gemini-3.5-flash", "gpt_5_5": "gpt-5.5", "gpt_oss_120b": "gpt-oss-120b",
+         "gemini_3_5_flash": "gemini-3.5-flash", "gpt_5_5": "gpt-5.5", "gpt_oss_120b": "gpt-oss-120b\n(OR)",
+         "gpt_oss_120b_selfhost": "gpt-oss-120b\n(vLLM)",
          "qwen3_30b": "qwen3-30b", "qwen3_5_122b": "qwen3.5-122b", "deepseek_v4_flash": "deepseek-v4-flash",
          "opus_4_8_direct": "opus-4.8\n(struct no-CoT†)", "gemini_3_1_pro": "gemini-3.1-pro\n(gen-only‡)"}
 LEVELS = ["complex_L1", "complex_L2", "complex_L3"]
@@ -51,10 +57,11 @@ FIGDIR = Path("figures/3p1_replication")
 # time, so the loader just reads it. gemini-3.1-pro (‡) is GENERALIZATION-ONLY — mandatory hidden
 # reasoning (effort:minimal only REDUCES it, never to 0), so we judge its VISIBLE body, NOT a faithful
 # hidden trace; included as a caveated datapoint per the user, not a faithful-actor headline.
-JUDGEABLE = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "gpt_oss_120b",
-             "qwen3_5_122b", "deepseek_v4_flash", "opus_4_8_direct", "gemini_3_1_pro"]
+JUDGEABLE = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",
+             "gpt_oss_120b_selfhost", "qwen3_5_122b", "deepseek_v4_flash", "opus_4_8_direct", "gemini_3_1_pro"]
 ACTOR_COLOR = {"gemini_2_5_flash": "#444444", "gemini_3_flash": "#1b9e77",
                "gemini_3_5_flash": "#66a61e", "gpt_5_5": "#d95f02", "gpt_oss_120b": "#7570b3",
+               "gpt_oss_120b_selfhost": "#54278f",
                "qwen3_5_122b": "#a6761d", "deepseek_v4_flash": "#e7298a",
                "opus_4_8_direct": "#1f78b4", "gemini_3_1_pro": "#999999"}
 

@@ -12,11 +12,12 @@ import matplotlib.pyplot as plt
 
 DATA = json.load(open("results/family_figure_data.json"))
 OUT = Path("figures/3p1_family_sweep"); OUT.mkdir(parents=True, exist_ok=True)
-_ALL = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "opus_4_8_direct", "gpt_oss_120b", "deepseek_v4_flash"]
+_ALL = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "opus_4_8_direct", "gpt_oss_120b", "gpt_oss_120b_selfhost", "deepseek_v4_flash"]
 ACTORS = [a for a in _ALL if DATA.get(a)]   # robust: only actors with data (deepseek appears once judged)
 LABEL = {"gemini_2_5_flash": "gemini-2.5-flash", "gemini_3_flash": "gemini-3-flash",
          "gemini_3_5_flash": "gemini-3.5-flash", "gpt_5_5": "gpt-5.5",
-         "opus_4_8_direct": "opus-4.8", "gpt_oss_120b": "gpt-oss-120b", "deepseek_v4_flash": "deepseek-v4-flash"}
+         "opus_4_8_direct": "opus-4.8", "gpt_oss_120b": "gpt-oss-120b (OR)",
+         "gpt_oss_120b_selfhost": "gpt-oss-120b (vLLM)", "deepseek_v4_flash": "deepseek-v4-flash"}
 FAMS = ["bignum", "iterated", "deductive", "indirection"]
 
 cp.set_style()

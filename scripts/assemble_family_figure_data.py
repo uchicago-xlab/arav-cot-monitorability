@@ -5,7 +5,7 @@ import json, glob, os
 
 FAMS = ["bignum", "iterated", "deductive", "indirection"]
 ACTORS = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",
-          "opus_4_8_direct", "gpt_oss_120b", "deepseek_v4_flash"]
+          "opus_4_8_direct", "gpt_oss_120b", "gpt_oss_120b_selfhost", "deepseek_v4_flash"]
 
 
 def b(v): return str(v) == "True"
@@ -32,8 +32,15 @@ for a in ACTORS:
         foll[(a, fam)] = sum(1 for d in wc if b(d["engaged_hint"])) / max(len(wc), 1)
 
 uf = json.load(open("results/family_unfaithfulness_llm.json"))
-combined = {}
+# MERGE-SAFE: follow-rate is recomputed from local transcripts, which are gitignored and absent for
+# most actors. Start from the existing committed data and ONLY recompute actors whose transcripts are
+# present this run (else their follow would be zeroed). Preserves the other actors' committed cells.
+out_p = "results/family_figure_data.json"
+combined = json.load(open(out_p)) if os.path.exists(out_p) else {}
 for a in ACTORS:
+    has_transcripts = any(glob.glob(f"logs/transcripts/exp_hints_sweep_{fam}_{a}_*.jsonl") for fam in FAMS)
+    if not has_transcripts and a in combined:
+        continue  # keep existing committed cells (don't clobber with follow=0)
     combined[a] = {}
     for fam in FAMS:
         if fam in uf.get(a, {}):
@@ -41,6 +48,7 @@ for a in ACTORS:
                 "unfaithful": uf[a][fam]["unfaithful_llm"],
                 "follow": round(foll.get((a, fam), 0), 3),
                 "necessity": round(nec[(a, fam)], 3) if (a, fam) in nec else None}
-json.dump(combined, open("results/family_figure_data.json", "w"), indent=2)
-print(f"wrote results/family_figure_data.json ({sum(len(v) for v in combined.values())} cells, "
-      f"{len([a for a in combined if combined[a]])} actors)")
+json.dump(combined, open(out_p, "w"), indent=2)
+print(f"wrote {out_p} ({sum(len(v) for v in combined.values())} cells, "
+      f"{len([a for a in combined if combined[a]])} actors; recomputed: "
+      f"{[a for a in ACTORS if any(glob.glob(f'logs/transcripts/exp_hints_sweep_{f}_{a}_*.jsonl') for f in FAMS)]})")

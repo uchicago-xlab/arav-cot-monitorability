@@ -16,6 +16,7 @@ dependencies = [
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
     "wandb>=0.17",             # experiment tracking — every run logs config + scalars + CoT table (CLAUDE.md)
+    "openai-harmony>=0.0.8",
 ]
 
 [project.optional-dependencies]

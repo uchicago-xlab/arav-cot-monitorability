@@ -24,9 +24,11 @@ Q = "A train travels 60 km in 40 minutes. What is its average speed in km/h? Rea
 
 
 def reasoning_of(resp):
-    """vLLM puts the parsed <think> trace on message.reasoning_content (extra field)."""
+    """The parsed <think> trace. This vLLM 0.24.0 endpoint returns it on message.`reasoning` (NOT
+    `reasoning_content`, verified live) — read that first, then fall back to `reasoning_content` for
+    endpoints/reasoning-parsers that use the older field (so the smoke check stops false-failing)."""
     msg = resp.choices[0].message
-    return getattr(msg, "reasoning_content", None) or ""
+    return getattr(msg, "reasoning", None) or getattr(msg, "reasoning_content", None) or ""
 
 
 def main():

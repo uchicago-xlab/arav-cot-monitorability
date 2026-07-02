@@ -68,6 +68,17 @@ actors:
     uplift_set: null
     experiments: [hints, gradient, oversight, followup_a]   # WIRED for all experiments; run phase0_qwen3_5.py BEFORE the sweep
     notes: "Qwen 3.5 successor to qwen3-235b-thinking. DROPPED from the OpenRouter §3.1 analysis 2026-06-28 (Arav): probe PASSED (raw ✅ + prefill ✅; necessity +0.17 one-shots = provisional) but the powered sweep is INFEASIBLE on OpenRouter — every endpoint (novita/bf16 crashed, siliconflow/fp8 wedged) hangs its 8k-token gens under sustained load (~137s/gen, ~19h projected; sweep reached 40/47 then stalled). --attempt-timeout prevents a terminal wedge but not the slowness. DEFERRED → self-hosted vLLM (see selfhost_vllm/ — gives reliable prefill + reasoning exposure + thinking-toggle + any size; ideal for the Follow-up C qwen DENSE scale ladder 1.7B→32B). Re-enable as a self-host actor once the vLLM endpoint is up; not in the committed 8-actor set."
+  qwen3_5_122b_selfhost:                            # SELF-HOSTED vLLM 0.24.0 twin of qwen3_5_122b (OpenRouter deferred)
+    id: openai-api/vllm/qwen3_5-122b                 # inspect `openai-api` provider: service `vllm` -> VLLM_BASE_URL + VLLM_API_KEY from env
+    provider: null                                    # self-host endpoint: NOT OpenRouter -> no provider-routing pin
+    cot_access: native_raw                            # raw faithful CoT (confirmed live: comes back in the `reasoning` field)
+    reasoning_enabled: null                           # OpenRouter-only arg; N/A on the self-host path (thinking toggled via chat_template_kwargs)
+    tier: faithful_hints_gradient
+    necessity: todo                                   # NOT load-bearing until per-model necessity verified on-pod (CLAUDE.md guardrail)
+    uplift_set: null
+    experiments: [hints]                              # decode-necessity + §3.1 only for now
+    no_cot_mechanism: vllm_structured                 # no-CoT arm = single-letter schema + chat_template_kwargs={enable_thinking:false} (prefill NOT honored here)
+    notes: "Self-host vLLM 0.24.0 (OpenAI-compatible at VLLM_BASE_URL, key VLLM_API_KEY); re-enables the deferred qwen3_5_122b on a reliable endpoint. NOT the gpt-oss actor — a separate future qwen self-host run (Follow-up C dense ladder). LIVE PROBE FINDINGS (Session #8): (1) CoT returns in the OpenAI `reasoning` message field (NOT `reasoning_content`). (2) thinking DISABLE works via request extra_body={\"chat_template_kwargs\": {\"enable_thinking\": false}} (the kwarg `thinking` does NOT work; must be `enable_thinking`) -> `reasoning` goes to 0 chars. (3) assistant PREFILL (continue_final_message) is NOT honored -> the no-CoT arm CANNOT prefill. Therefore no_cot_mechanism=vllm_structured. Only ONE vLLM model is served at a time (currently gpt-oss-120b); serve qwen3.5 under --served-model-name qwen3_5-122b before invoking this actor."
   kimi_k2_thinking:                                  # Moonshot — independent faithful family (cross-lab robustness)
     id: openrouter/moonshotai/kimi-k2-thinking       # Kimi K2 Thinking (~1T MoE); OpenRouter catalog 2026-06-26
     provider: novita/bf16                            # bf16 endpoint (project pref bf16>fp8>int4); alts: atlas-cloud/int4, google-vertex
@@ -97,7 +108,18 @@ actors:
     necessity: todo
     uplift_set: null
     experiments: [hints, oversight, followup_a]     # NOT gradient: §3.2 prefill-forcing INVALID (see notes)
-    notes: "Open-weight faithful raw CoT; fallback substrate if qwen3 unavailable. §3.2 (gradient) REMOVED — DEFINITIVE: reasoning is MANDATORY on all 17 OpenRouter gpt-oss-120b endpoints (can't disable the re-deriving analysis channel), so a forced wrong intermediate is adopted 0/33 across 15 providers × 2 vehicles (body + reasoning-field), incl. 'let's correct' re-derivation (2026-06-24, scripts/phase0_gptoss_adoption.py + phase0_forcing_check.py). Out of §3.2."
+    notes: "Open-weight faithful raw CoT; fallback substrate if qwen3 unavailable. §3.2 (gradient) REMOVED — DEFINITIVE: reasoning is MANDATORY on all 17 OpenRouter gpt-oss-120b endpoints (can't disable the re-deriving analysis channel), so a forced wrong intermediate is adopted 0/33 across 15 providers × 2 vehicles (body + reasoning-field), incl. 'let's correct' re-derivation (2026-06-24, scripts/phase0_gptoss_adoption.py + phase0_forcing_check.py). Out of §3.2. §3.1 decode/family numbers are PROVIDER-SUSPECT (all +0.00/one-shot, iterated cells NEGATIVE = disabled arm still reasoning) → re-run faithfully self-hosted, see gpt_oss_120b_selfhost."
+  gpt_oss_120b_selfhost:                            # SELF-HOSTED vLLM twin of gpt_oss_120b (OpenRouter numbers provider-suspect → faithful re-run)
+    id: openai-api/vllm/gpt-oss-120b                 # inspect `openai-api` provider: service `vllm` -> VLLM_BASE_URL + VLLM_API_KEY from env; the model segment `gpt-oss-120b` = the vLLM --served-model-name
+    provider: null                                    # self-host endpoint: NOT OpenRouter -> no provider-routing pin
+    cot_access: native_raw                            # harmony `analysis` channel -> vLLM 0.24.0 surfaces it on message.reasoning (verified live); with-CoT arm judges that trace
+    reasoning_enabled: null                           # OpenRouter-only arg; N/A on the self-host path
+    tier: faithful_hints_gradient
+    necessity: todo                                   # NOT load-bearing until Gate 0 (channel disableable) + per-model uplift verified on-pod (CLAUDE.md guardrail)
+    uplift_set: null
+    experiments: [hints]                              # §3.1 decode-necessity + family sweep only (this re-run's scope)
+    no_cot_mechanism: harmony_final                   # no-CoT arm = harmony FINAL-channel force via raw /v1/completions (openai_harmony-rendered prompt ending <|channel|>final<|message|><answer>) -> generation STARTS in the final channel, ZERO analysis tokens (verified live). NOT prefill (chat prefill does NOT skip analysis) nor vllm_structured (structured output still reasons; gpt-oss has no enable_thinking kwarg).
+    notes: "Self-host vLLM 0.24.0 (OpenAI-compatible at VLLM_BASE_URL, key VLLM_API_KEY). SERVED: `vllm serve openai/gpt-oss-120b --served-model-name gpt-oss-120b --max-model-len 8192 --enable-prefix-caching --max-num-seqs 512 --gpu-memory-utilization 0.92`, tensor-parallel 1, NO --reasoning-parser flag (vLLM auto-configures harmony parsing for gpt-oss anyway) and NO dtype override -> gpt-oss native mxfp4. Re-runs gpt_oss_120b §3.1 faithfully: OpenRouter can't disable the analysis channel (mandatory on all endpoints) so its 'no-CoT' arm still reasoned -> fake +0.00 / negative uplift. On vLLM the harmony final-channel force gives a TRUE zero-analysis no-CoT arm (Gate 0). Server owned by the human — do NOT restart/reconfigure."
   gpt_5_5:                                          # CONDITIONAL — faithful ONLY channel-disabled
     id: openrouter/openai/gpt-5.5                   # unlisted in /models but routable; fallback openai/gpt-5
     provider: openai
