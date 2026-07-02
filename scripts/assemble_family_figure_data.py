@@ -4,8 +4,12 @@ into results/family_figure_data.json for make_family_figures.py."""
 import json, glob, os
 
 FAMS = ["bignum", "iterated", "deductive", "indirection"]
-ACTORS = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",
-          "opus_4_8_direct", "gpt_oss_120b", "deepseek_v4_flash"]
+# Self-host qwen3.5 ONLY: the other 7 actors' raw transcripts are absent on a fresh checkout
+# (gitignored logs/), so recomputing their follow-rate would zero it. MERGE qwen into the existing
+# results/family_figure_data.json instead. Figure key = short name qwen3_5_122b (pre-seeded in the
+# figC1/C2/family actor orders); its data comes from the _selfhost transcripts via the glob below.
+ACTORS = ["qwen3_5_122b"]
+COMBINED_PATH = "results/family_figure_data.json"
 
 
 def b(v): return str(v) == "True"
@@ -32,7 +36,8 @@ for a in ACTORS:
         foll[(a, fam)] = sum(1 for d in wc if b(d["engaged_hint"])) / max(len(wc), 1)
 
 uf = json.load(open("results/family_unfaithfulness_llm.json"))
-combined = {}
+# MERGE: start from the committed file so the 7 existing actors are preserved; update only ACTORS.
+combined = json.load(open(COMBINED_PATH)) if os.path.exists(COMBINED_PATH) else {}
 for a in ACTORS:
     combined[a] = {}
     for fam in FAMS:
@@ -41,6 +46,6 @@ for a in ACTORS:
                 "unfaithful": uf[a][fam]["unfaithful_llm"],
                 "follow": round(foll.get((a, fam), 0), 3),
                 "necessity": round(nec[(a, fam)], 3) if (a, fam) in nec else None}
-json.dump(combined, open("results/family_figure_data.json", "w"), indent=2)
-print(f"wrote results/family_figure_data.json ({sum(len(v) for v in combined.values())} cells, "
-      f"{len([a for a in combined if combined[a]])} actors)")
+json.dump(combined, open(COMBINED_PATH, "w"), indent=2)
+print(f"wrote {COMBINED_PATH} (merged; {sum(len(v) for v in combined.values())} cells, "
+      f"{len([a for a in combined if combined[a]])} actors: {', '.join(combined)})")

@@ -108,7 +108,9 @@ async def run_actor(name, args, reuse):
     # sampler to read the letter from / capture that field. NB: their reasoning channel is not
     # disableable, so the forced-no-CoT arm may not fully suppress it → uplift is a LOWER bound.
     max_tokens = max(args.max_tokens, 8000) if cot_source == "reasoning" else args.max_tokens
-    gc = GenerateConfig(temperature=args.temperature, max_tokens=max_tokens)
+    # max_connections = concurrency×n_samples so inspect doesn't throttle the self-host (no ext rate limit)
+    gc = GenerateConfig(temperature=args.temperature, max_tokens=max_tokens,
+                        max_connections=max(args.concurrency * args.n_samples, 8))
     if args.attempt_timeout:           # slow MoE providers (novita/siliconflow) hang long gens; fail+retry, don't wedge
         gc = gc.model_copy(update={"attempt_timeout": args.attempt_timeout})
     model = roster.build_model(name, config=gc)
@@ -139,6 +141,12 @@ async def run_actor(name, args, reuse):
                 k_cot = round(sum(r.pass_cot for r in res) * args.n_samples)
                 k_nocot = round(sum(r.pass_nocot for r in res) * args.n_samples)
                 row = _row(family, level, k_cot, n, k_nocot, n, "fresh")
+                # per-arm emission (extractable answer) for THIS cell, from its captured rollouts
+                cell_prompts = {d["prompt"] for d in info}
+                cc = [c for c in captures if c.prompt in cell_prompts]
+                ec = [c for c in cc if c.with_cot]; en = [c for c in cc if not c.with_cot]
+                row["emit_cot"] = round(sum(1 for c in ec if c.extracted) / max(len(ec), 1), 3)
+                row["emit_nocot"] = round(sum(1 for c in en if c.extracted) / max(len(en), 1), 3)
                 row["info"] = info
             rows.append(row)
             ci = f"[{row['uplift_lo']:+.2f},{row['uplift_hi']:+.2f}]"
@@ -146,9 +154,14 @@ async def run_actor(name, args, reuse):
                   f"{row['uplift']:>+8.2f} {ci:>16}  {row['necessity']:13} {row['source']}", flush=True)
     wall = time.monotonic() - t0
     n_fresh = sum(1 for r in rows if r["source"] == "fresh")
+    # actor-level per-arm emission across all FRESH rollouts (channel-disable evidence for qwen self-host)
+    ec_all = [c for c in captures if c.with_cot]; en_all = [c for c in captures if not c.with_cot]
+    emit_cot = round(sum(1 for c in ec_all if c.extracted) / max(len(ec_all), 1), 3)
+    emit_nocot = round(sum(1 for c in en_all if c.extracted) / max(len(en_all), 1), 3)
     meta = {"actor": name, "cot_access": entry.cot_access, "cot_source": cot_source,
             "max_tokens": max_tokens, "count": args.count, "n_samples": args.n_samples,
-            "n_fresh_cells": n_fresh, "n_reused_cells": len(rows) - n_fresh, "wall_s": wall, **stats}
+            "n_fresh_cells": n_fresh, "n_reused_cells": len(rows) - n_fresh, "wall_s": wall,
+            "emission_with_cot": emit_cot, "emission_no_cot": emit_nocot, **stats}
 
     if not args.no_wandb and captures:
         try:

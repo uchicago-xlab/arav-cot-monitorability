@@ -19,7 +19,11 @@ from inspect_ai.model import GenerateConfig, ChatMessageUser
 from cot_mon.models import roster
 
 FAMS = ["bignum", "iterated", "deductive", "indirection"]
-ACTORS = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "opus_4_8_direct", "gpt_oss_120b", "deepseek_v4_flash"]
+# Self-host qwen3.5 ONLY: the other 7 actors' raw transcripts live in gitignored logs/ and are ABSENT
+# on a fresh checkout, so re-judging them would zero out their committed results. We MERGE qwen into
+# the existing results/family_unfaithfulness_llm.json instead (see main()). Figure key = short name.
+ACTORS = ["qwen3_5_122b"]
+OUT_PATH = "results/family_unfaithfulness_llm.json"
 SAMPLE_CAP = 150
 CONC = 20
 
@@ -69,7 +73,8 @@ async def main():
               "_default": roster.build_model("gemini_3_flash", config=gc)}
     sem = asyncio.Semaphore(CONC)
     rng = random.Random(0)
-    out = {}
+    # MERGE: start from the committed 7-actor results so qwen is ADDED, not a full overwrite.
+    out = json.load(open(OUT_PATH)) if os.path.exists(OUT_PATH) else {}
     for actor in ACTORS:
         jm = judges.get(actor, judges["_default"])
         out[actor] = {"judge": "gemini_2_5_flash" if actor == "gemini_3_flash" else "gemini_3_flash"}
@@ -94,8 +99,8 @@ async def main():
                   f"conceal/foll={conceal_rate:.2f} raw={raw_unfaith:.3f} base={base:.3f} "
                   f"-> unfaithful={out[actor][fam]['unfaithful_llm']:.3f}", flush=True)
     Path("results").mkdir(exist_ok=True)
-    Path("results/family_unfaithfulness_llm.json").write_text(json.dumps(out, indent=2))
-    print("\nwrote results/family_unfaithfulness_llm.json")
+    Path(OUT_PATH).write_text(json.dumps(out, indent=2))
+    print(f"\nwrote {OUT_PATH} (merged; {len(out)} actors: {', '.join(out)})")
 
 
 if __name__ == "__main__":

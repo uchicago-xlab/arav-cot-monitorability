@@ -65,7 +65,9 @@ async def run_actor(name, args):
     # native_raw actors emit their CoT in the reasoning channel -> need headroom; floor configurable
     # (--reasoning-floor) so the slow MoE actors (gpt-oss/deepseek) can be capped lower to speed up.
     max_tokens = max(args.max_tokens, args.reasoning_floor) if cot_source == "reasoning" else args.max_tokens
-    gc = GenerateConfig(temperature=args.temperature, max_tokens=max_tokens)
+    # max_connections = concurrency so inspect's client limiter doesn't throttle below the requested
+    # in-flight count (self-host has no external rate limit → saturate the GPU).
+    gc = GenerateConfig(temperature=args.temperature, max_tokens=max_tokens, max_connections=args.concurrency)
     if args.attempt_timeout:           # cap per-attempt latency so a hung request fails+retries
         gc = gc.model_copy(update={"attempt_timeout": args.attempt_timeout})   # instead of wedging the pool (the novita/qwen3.5 stall)
     # --cache-prompt (technique #3): Anthropic prompt caching for direct-Claude actors (opus_4_8_direct).
@@ -81,18 +83,63 @@ async def run_actor(name, args):
 
     items = data.load_gpqa(n=args.candidates)
     t0 = time.monotonic()
-    if args.no_filter:
+    # CHECKPOINT the (stochastic, unseeded) correct-with-CoT filter result so the ~expensive filter is
+    # paid ONCE: --resume-kept reloads the saved kept-item IDs and SKIPS the filter → a killed run can
+    # relaunch straight into the sweep (e.g. to switch on --item-concurrency) without re-filtering.
+    kept_file = Path(f"logs/kept_{name}.json")
+    if args.resume_kept and kept_file.exists():
+        kept_ids = json.loads(kept_file.read_text())["kept_ids"]
+        by_id = {it.id: it for it in items}
+        kept = [by_id[i] for i in kept_ids if i in by_id]
+        rates = {}
+        print(f"  [{name}] RESUME: loaded {len(kept)} kept items from {kept_file} (filter SKIPPED)", flush=True)
+    elif args.no_filter:
         kept = items[:args.n_items]
         rates = {}
     else:
         kept, rates = await solver.correct_with_cot(model, items, n_samples=args.filter_samples,
                                                     threshold=args.min_correct, concurrency=args.concurrency)
         kept = kept[:args.n_items]
+    if kept and not args.dry and not args.resume_kept:
+        Path("logs").mkdir(exist_ok=True)
+        kept_file.write_text(json.dumps({"kept_ids": [it.id for it in kept], "n_candidates": len(items)}, indent=2))
     print(f"  [{name}] filter: kept {len(kept)}/{len(items)} (correct-with-CoT >= {args.min_correct})", flush=True)
     if not kept:
         print(f"  [{name}] no items survived the filter."); return None, None
 
     id2item = {it.id: it for it in kept}
+
+    # ── per-item INCREMENTAL transcript flush (SPEC: don't buffer a whole cell; a half-finished run
+    # must still yield data). Written to logs/transcripts_incr/ (a DISTINCT dir so it never collides
+    # with the WandB-written canonical logs/transcripts/*_{rid}.jsonl the figures consume). The monitor
+    # reads these live; on interruption they can be copied into logs/transcripts/ to feed downstream.
+    # Rows use the SAME solver.rollout_row schema + _finalize's family routing (none/simple duplicated
+    # into every family file; complex_<fam>_L<lv> normalised to complex_L<lv> in that family's file).
+    incr_files: dict = {}
+    if args.share_baseline and not args.dry:
+        incr_dir = Path("logs/transcripts_incr"); incr_dir.mkdir(parents=True, exist_ok=True)
+        incr_files = {fam: (incr_dir / f"exp_hints_sweep_{fam}_{name}.jsonl").open("w") for fam in args.families}
+
+    def _incr(item_records):
+        if not incr_files:
+            return
+        for rec in item_records:
+            it = id2item.get(rec.item_id)
+            if it is None:
+                continue
+            if rec.hint_kind in ("none", "simple"):
+                targets, norm = list(incr_files), rec
+            elif rec.hint_kind.startswith("complex_"):
+                fam = rec.hint_kind.split("_")[1]
+                if fam not in incr_files:
+                    continue
+                targets = [fam]
+                norm = dataclasses.replace(rec, hint_kind=rec.hint_kind.replace(f"complex_{fam}_", "complex_"))
+            else:
+                continue
+            row = json.dumps(solver.rollout_row(norm, it), default=str)
+            for fam in targets:
+                incr_files[fam].write(row + "\n"); incr_files[fam].flush()
 
     async def _finalize(fam, fam_records, wall):
         """summary + print + W&B + log for ONE family's records (none/simple + that family's complex,
@@ -129,12 +176,28 @@ async def run_actor(name, args):
 
     if args.share_baseline:   # technique #2: none/simple + filter paid ONCE, complex per family
         records_all = []
-        for i, it in enumerate(kept):
-            records_all += await solver.run_sweep_multi(model, it, n_samples=args.n_samples,
-                families=tuple(args.families), levels=levels, seed=args.seed, cot_source=cot_source,
-                concurrency=args.concurrency, no_cot_mechanism=no_cot_mechanism)
-            if (i + 1) % 10 == 0:
-                print(f"  [{name}] ... {i + 1}/{len(kept)} items swept (shared baseline, {len(args.families)} fam)", flush=True)
+        # ITEM PIPELINING: run up to --item-concurrency items concurrently so the shared client pool
+        # (max_connections=--concurrency) stays FULL across item boundaries. The old sequential loop
+        # drained the pool to a single item's slowest (up to 28k-token) with-CoT gen before the next
+        # item started — a per-item barrier that wastes GPU on qwen's heavy-tailed CoT. With several
+        # items in flight, other items' gens backfill the tail. item_concurrency=1 == old behaviour.
+        item_sem = asyncio.Semaphore(max(1, args.item_concurrency))
+        flush_lock = asyncio.Lock()
+        prog = {"done": 0}
+
+        async def _sweep_item(it):
+            async with item_sem:
+                item_recs = await solver.run_sweep_multi(model, it, n_samples=args.n_samples,
+                    families=tuple(args.families), levels=levels, seed=args.seed, cot_source=cot_source,
+                    concurrency=args.concurrency, no_cot_mechanism=no_cot_mechanism)
+            async with flush_lock:               # per-item flush + progress as each item completes
+                records_all.extend(item_recs)
+                _incr(item_recs)
+                prog["done"] += 1
+                print(f"  [{name}] ... {prog['done']}/{len(kept)} items swept "
+                      f"(shared baseline, {len(args.families)} fam)", flush=True)
+
+        await asyncio.gather(*(_sweep_item(it) for it in kept))
         wall = time.monotonic() - t0
         base = [r for r in records_all if r.hint_kind in ("none", "simple")]
         summary = meta = None
@@ -143,6 +206,8 @@ async def run_actor(name, args):
             fam_complex = [dataclasses.replace(r, hint_kind=r.hint_kind.replace(pref, "complex_"))
                            for r in records_all if r.hint_kind.startswith(pref)]
             summary, meta = await _finalize(fam, base + fam_complex, wall)
+        for f in incr_files.values():
+            f.close()
         meta = dict(meta or {}); meta["n_rollouts"] = len(records_all)
         meta["in_tok"] = sum(r.in_tok for r in records_all); meta["out_tok"] = sum(r.out_tok for r in records_all)
         meta["n_gen_incl_filter"] = len(records_all) + (len(items) * args.filter_samples if not args.no_filter else 0)
@@ -255,6 +320,13 @@ if __name__ == "__main__":
                     help="min max_tokens for native_raw (reasoning-channel) actors; lower (e.g. 5000) "
                          "speeds up gpt-oss/deepseek at the cost of more truncated/no-answer rollouts.")
     ap.add_argument("--concurrency", type=int, default=8)
+    ap.add_argument("--item-concurrency", type=int, default=1,
+                    help="items processed CONCURRENTLY (share-baseline path). >1 pipelines items so the "
+                         "shared client pool stays full across item boundaries (no per-item drain). "
+                         "Default 1 = original sequential behaviour (keeps other actors reproducible).")
+    ap.add_argument("--resume-kept", action="store_true",
+                    help="skip the correct-with-CoT filter and reload the saved kept-item IDs from "
+                         "logs/kept_<actor>.json (written by a prior run) → relaunch straight into the sweep.")
     ap.add_argument("--attempt-timeout", type=int, default=None,
                     help="per-attempt generation timeout (s); a hung request fails+retries instead of "
                          "wedging the concurrency pool (the novita/qwen3.5 stall). Use with slow MoE actors.")

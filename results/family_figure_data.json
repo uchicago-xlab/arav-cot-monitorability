@@ -152,5 +152,27 @@
       "follow": 0.052,
       "necessity": 0.0
     }
+  },
+  "qwen3_5_122b": {
+    "bignum": {
+      "unfaithful": 0.163,
+      "follow": 0.962,
+      "necessity": 0.785
+    },
+    "iterated": {
+      "unfaithful": 0.206,
+      "follow": 0.92,
+      "necessity": 0.736
+    },
+    "deductive": {
+      "unfaithful": 0.215,
+      "follow": 0.911,
+      "necessity": 0.264
+    },
+    "indirection": {
+      "unfaithful": 0.038,
+      "follow": 0.219,
+      "necessity": 0.694
+    }
   }
 }
