@@ -5,7 +5,8 @@ import json, glob, os
 
 FAMS = ["bignum", "iterated", "deductive", "indirection"]
 ACTORS = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",
-          "opus_4_8_direct", "gpt_oss_120b", "gpt_oss_120b_selfhost", "deepseek_v4_flash"]
+          "opus_4_8_direct", "gpt_oss_120b", "gpt_oss_120b_selfhost", "deepseek_v4_flash",
+          "qwen3_5_122b"]
 
 
 def b(v): return str(v) == "True"
