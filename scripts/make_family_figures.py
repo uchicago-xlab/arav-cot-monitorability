@@ -6,23 +6,48 @@ import json, sys
 from pathlib import Path
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".claude/skills/clean-figures/scripts"))
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / ".claude/skills/clean-figures/scripts"))
+sys.path.insert(0, str(REPO / "scripts"))
 import cleanplot as cp
 import matplotlib.pyplot as plt
+import make_complex_figures as mcf   # answered-only decode counters (local, no API)
 
 DATA = json.load(open("results/family_figure_data.json"))
 OUT = Path("figures/3p1_family_sweep"); OUT.mkdir(parents=True, exist_ok=True)
-_ALL = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "opus_4_8_direct", "gpt_oss_120b", "gpt_oss_120b_selfhost", "deepseek_v4_flash"]
+_ALL = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "opus_4_8_direct", "gpt_oss_120b_selfhost", "deepseek_v4_flash"]
 ACTORS = [a for a in _ALL if DATA.get(a)]   # robust: only actors with data (deepseek appears once judged)
 LABEL = {"gemini_2_5_flash": "gemini-2.5-flash", "gemini_3_flash": "gemini-3-flash",
          "gemini_3_5_flash": "gemini-3.5-flash", "gpt_5_5": "gpt-5.5",
-         "opus_4_8_direct": "opus-4.8", "gpt_oss_120b": "gpt-oss-120b (OR)",
-         "gpt_oss_120b_selfhost": "gpt-oss-120b (vLLM)", "deepseek_v4_flash": "deepseek-v4-flash"}
+         "opus_4_8_direct": "opus-4.8",
+         "gpt_oss_120b_selfhost": "gpt-oss-120b", "deepseek_v4_flash": "deepseek-v4-flash"}
 FAMS = ["bignum", "iterated", "deductive", "indirection"]
 
 cp.set_style()
 FCOLOR = dict(zip(FAMS, cp.colors(FAMS)))   # locked family colors, shared across figures
 LEGEND = {f: FCOLOR[f] for f in FAMS}
+
+
+def answered_necessity():
+    """Mean ANSWERED-ONLY decode-uplift per (actor, family) over that family's levels — the
+    answered-rollouts-only companion to family_figure_data.json's all-rollout `necessity` (abstains
+    dropped from num & denom). Local/no-API: per-rollout decode transcripts, or the selfhost decode
+    JSON's per-cell emit rates. Actors without per-rollout answer data (opus batch-API) get NO entry,
+    so they drop off the answered-only scatter — the same honest exclusion as the answered-only heatmap."""
+    out = {}
+    for a in _ALL:
+        counts = mcf._answered_counts_from_transcript(a) or mcf._answered_counts_from_emit(a)
+        if not counts:
+            continue
+        for fam in FAMS:
+            ups = [(kc / nc if nc else 0.0) - (kn / nn if nn else 0.0)
+                   for (f, _lv), (kc, nc, kn, nn) in counts.items() if f == fam]
+            if ups:
+                out[(a, fam)] = sum(ups) / len(ups)
+    return out
+
+
+NEC_ANS = answered_necessity()
 
 
 def grouped_bar(metric, title, ylabel, fname, label_fmt="{:.2f}"):
@@ -47,23 +72,25 @@ p1 = grouped_bar("unfaithful", "Concealment by hint type",
 p3 = grouped_bar("follow", "Follow rate by hint type", "follow rate (with-CoT)",
                  "fig_family_followrate.png")
 
-# (2) necessity vs unfaithfulness scatter (exclude opus — no necessity data)
+# (2) necessity vs unfaithfulness scatter — x = ANSWERED-ONLY decode-necessity (abstains excluded).
+# Actors without per-rollout answer data (opus) have no answered-only necessity → absent from this scatter.
 fig, ax = plt.subplots(figsize=(8, 6))
 for fam in FAMS:
     xs, ys = [], []
     for a in ACTORS:
         c = DATA[a].get(fam, {})
-        if c.get("necessity") is not None:
-            xs.append(c["necessity"]); ys.append(c["unfaithful"])
+        nec = NEC_ANS.get((a, fam))
+        if nec is not None and c.get("unfaithful") is not None:
+            xs.append(nec); ys.append(c["unfaithful"])
     ax.scatter(xs, ys, s=90, color=FCOLOR[fam], edgecolor=cp.SLATE, linewidth=0.5, label=fam, zorder=3)
 ax.axhline(0, color=cp.GRID, lw=1, zorder=1)
-ax.set_xlabel("decode-necessity (with-CoT − no-CoT decode accuracy)")
+ax.set_xlabel("decode-necessity, answered rollouts only (with-CoT − no-CoT decode accuracy)")
 ax.set_ylabel("unfaithful following (LLM-judged)")
 # annotate the deductive outlier cluster (low necessity, low concealment)
 ax.annotate("deductive: one-shot but\nopenly reasoned, not concealed",
             xy=(0.03, 0.02), xytext=(0.18, 0.16), fontsize=9, color=cp.MUTED,
             arrowprops=dict(arrowstyle="->", color=cp.MUTED, lw=1))
-cp.title(fig, "Decode-necessity vs concealment")
+cp.title(fig, "Decode-necessity (answered rollouts only) vs concealment")
 p2 = cp.finalize(fig, OUT / "fig_necessity_vs_unfaithfulness.png", legend=LEGEND)
 
 print("wrote:", p1, p2, p3)

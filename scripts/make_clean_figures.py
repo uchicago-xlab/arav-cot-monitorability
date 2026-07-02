@@ -49,13 +49,9 @@ def disp(actor: str) -> str:
     return mf.LABEL.get(actor, actor.replace("_", "-")).split("\n")[0].split(" (")[0]
 
 
-# The DECODE figs (figC1/figC2) show BOTH gpt-oss rows — the provider-suspect OpenRouter one and the
-# faithful self-host one — so they MUST keep the OR/vLLM tag to be distinguishable (disp() strips it).
-_DECODE_LABEL = {"gpt_oss_120b": "gpt-oss-120b (OR)", "gpt_oss_120b_selfhost": "gpt-oss-120b (vLLM)"}
-
-
+# gpt-oss-120b appears once, via the faithful self-host (vLLM) run — the OpenRouter row is dropped.
 def ddisp(actor: str) -> str:
-    return _DECODE_LABEL.get(actor, disp(actor))
+    return disp(actor)
 
 
 # ── 1. HEADLINE (Gate 1) — recomputed from transcripts so all judgeable actors appear ─────────────
@@ -239,7 +235,7 @@ def fig5_concealment() -> Path:
 
 # ── C1. DECODE-UPLIFT by family (clean horizontal small-multiples) ────────────────────────────────
 DECODE_ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",
-                "gpt_oss_120b", "gpt_oss_120b_selfhost", "deepseek_v4_flash", "qwen3_5_122b"]
+                "gpt_oss_120b_selfhost", "deepseek_v4_flash", "qwen3_5_122b"]
 
 
 def _decode_cells() -> dict:
@@ -284,7 +280,11 @@ def figC1_decode_uplift_by_family(cells: dict) -> Path:
 
 
 # ── C2. NECESSITY heatmap (clean small-multiples by family) ───────────────────────────────────────
-def figC2_necessity_heatmap(cells: dict) -> Path:
+_C2_SUBTITLE = ("color = uplift (red low to green high) · green = CoT-necessary · 1 one-shot · "
+                "× too-hard · ~ weak")
+
+
+def _render_c2(cells: dict, title: str, fname: str) -> Path:
     actors = [a for a in DECODE_ORDER if any((a, f, lv) in cells for f in FAMILIES for lv in LEVELS)]
     cp.set_style()
     fig, axes = plt.subplots(1, len(FAMILIES), figsize=(2.7 * len(FAMILIES), 4.6), sharey=True)
@@ -307,9 +307,38 @@ def figC2_necessity_heatmap(cells: dict) -> Path:
                 ax.text(li, ai, txt, ha="center", va="center", fontsize=7.5,
                         color="#999" if c is None else cp.SLATE)
     axes[0].set_yticks(range(len(actors))); axes[0].set_yticklabels([ddisp(a) for a in actors])
-    cp.title(fig, "Necessity map — uplift by model × level",
-             "color = uplift (red low to green high) · green = CoT-necessary · 1 one-shot · × too-hard · ~ weak")
-    return cp.finalize(fig, OUT / "figC2_necessity_heatmap.png")
+    cp.title(fig, title, _C2_SUBTITLE)
+    return cp.finalize(fig, OUT / fname)
+
+
+def figC2_necessity_heatmap(cells: dict) -> Path:
+    return _render_c2(cells, "Necessity map — uplift by model × level", "figC2_necessity_heatmap.png")
+
+
+def figC2_necessity_heatmap_answered_only(cells: dict) -> Path:
+    """Companion to figC2 restricted to rollouts that EMITTED an answer (abstains dropped from num &
+    denom). Same clean layout; gpt-oss (vLLM) is included via the selfhost JSON's emit rates."""
+    return _render_c2(cells, "Necessity map — answered rollouts only",
+                      "figC2_necessity_heatmap_answered_only.png")
+
+
+def _decode_cells_answered() -> dict:
+    """figC2 cells (up/lo/hi/verdict) over ANSWERED rollouts only. Reuses make_complex_figures' local,
+    no-API counters: per-rollout decode transcripts where present, else the selfhost JSON's emit rates."""
+    import make_complex_figures as mcf
+    cells = {}
+    for a in DECODE_ORDER:
+        counts = mcf._answered_counts_from_transcript(a) or mcf._answered_counts_from_emit(a)
+        if not counts:
+            continue
+        for (fam, lv), (kc, nc, kn, nn) in counts.items():
+            acc_c = kc / nc if nc else 0.0
+            acc_n = kn / nn if nn else 0.0
+            up = acc_c - acc_n
+            lo, hi = metrics.wilson_diff_ci(kc, nc, kn, nn) if nc and nn else (up, up)
+            cells[(a, fam, lv)] = {"up": up, "lo": lo, "hi": hi,
+                                   "verdict": metrics.decode_necessity_label(acc_c, acc_n)}
+    return cells
 
 
 # ── §3.2 / Follow-up C — adopt-rate vs difficulty B ───────────────────────────────────────────────
@@ -397,6 +426,11 @@ CAPTIONS = {
     "figC2_necessity_heatmap.png":
         "Per-family decode-uplift across L1–L3. Glyphs disambiguate near-zero cells: green/blank = "
         "CoT-necessary, 1 = one-shot, × = too-hard, ~ = weak.",
+    "figC2_necessity_heatmap_answered_only.png":
+        "Companion to figC2 restricted to rollouts that emitted an answer (abstains dropped from "
+        "numerator and denominator) — 'when the model does answer, does CoT still help'. Computed from "
+        "the per-rollout decode transcripts (and the gpt-oss-vLLM cell from the run's per-cell emission "
+        "rates). Same glyphs.",
     "adopt_vs_B_combined.png":
         "§3.2 gradient (Follow-up C): adopt-rate (continues from the planted wrong step) vs operand "
         "magnitude B, 8 items/level, Wilson 2σ. No crossover B is reached within the swept range for "
@@ -407,10 +441,12 @@ CAPTIONS = {
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     cells = _decode_cells()
+    cells_ans = _decode_cells_answered()
     builders = [
         fig0_paper_analog, fig0c_filter_effect, fig1_headline, fig3_decode_uplift,
         fig4_follow_rate, fig5_concealment,
         lambda: figC1_decode_uplift_by_family(cells), lambda: figC2_necessity_heatmap(cells),
+        lambda: figC2_necessity_heatmap_answered_only(cells_ans),
         adopt_vs_B_combined,
     ]
     paths = []

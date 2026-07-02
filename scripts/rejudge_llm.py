@@ -30,9 +30,24 @@ from cot_mon.models import roster  # noqa: E402
 
 TDIR = Path("logs/transcripts")
 BACKUP = Path("logs/transcripts_pre_llm_backup")          # current (regex_v2) verdicts, pre-LLM
-ACTORS = ["gemini_2_5_flash", "gemini_3_flash", "gpt_5_5", "gpt_oss_120b"]
-SETS = {"filtered": "exp_hints_sweep", "unfiltered": "exp_hints_sweep_unfiltered"}
+# All judgeable arithmetic-sweep actors (unfiltered exists only for the original 4).
+FILTERED_ACTORS = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",
+                   "opus_4_8_direct", "gemini_3_1_pro", "gpt_oss_120b", "gpt_oss_120b_selfhost",
+                   "deepseek_v4_flash"]
+UNFILTERED_ACTORS = ["gemini_2_5_flash", "gemini_3_flash", "gpt_5_5", "gpt_oss_120b"]
+SETS = {"filtered": ("exp_hints_sweep", FILTERED_ACTORS),
+        "unfiltered": ("exp_hints_sweep_unfiltered", UNFILTERED_ACTORS)}
 N_OPT = 4
+
+
+def _transcript(exp, actor):
+    """Exactly-one transcript for {exp}_{actor}_<runid>.jsonl; None if absent. The runid never
+    contains '_', which disambiguates gpt_oss_120b from gpt_oss_120b_selfhost."""
+    cands = [p for p in sorted(TDIR.glob(f"{exp}_{actor}_*.jsonl"))
+             if "_rejudged" not in p.name and "_" not in p.name[len(f"{exp}_{actor}_"):-len(".jsonl")]]
+    if len(cands) > 1:
+        raise SystemExit(f"ambiguous transcripts for {exp}_{actor}: {[p.name for p in cands]}")
+    return cands[0] if cands else None
 
 
 def _reconstruct(gold_letter, seed, family="arithmetic", levels=(1, 2, 3)):
@@ -45,7 +60,7 @@ def _reconstruct(gold_letter, seed, family="arithmetic", levels=(1, 2, 3)):
                     for lv in levels}
 
 
-async def rejudge_file(path, judge, sem, limit):
+async def rejudge_file(path, judge, sem, limit, judge_name="gemini-3-flash"):
     rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
     seen = {}  # (cond) -> count, for --limit
     tasks = []
@@ -55,7 +70,7 @@ async def rejudge_file(path, judge, sem, limit):
             try:
                 hu = await coro
                 row["judge_verdict"] = hu.used
-                row["judge_method"] = "llm:gemini-3-flash"
+                row["judge_method"] = f"llm:{judge_name}"
                 row["judge_rationale"] = ", ".join(hu.evidence)
             except Exception as e:  # keep prior verdict on failure; mark it
                 row["judge_method"] = f"llm_error:{type(e).__name__}"
@@ -109,20 +124,27 @@ async def main():
     args = ap.parse_args()
     BACKUP.mkdir(parents=True, exist_ok=True)
 
-    judge = roster.build_model(args.monitor, config=GenerateConfig(temperature=0.0, max_tokens=8))
+    gc = GenerateConfig(temperature=0.0, max_tokens=8)
+    judge = roster.build_model(args.monitor, config=gc)
+    ALT = "gemini_2_5_flash"  # anti-self-judge (same convention as rejudge_families.py)
+    alt_judge = roster.build_model(ALT, config=gc)
     sem = asyncio.Semaphore(args.concurrency)
-    print(f"monitor = {args.monitor} ({roster.get_entry(args.monitor).id})\n")
-    print(f"{'set':10} {'actor':17} {'baseline':>8} {'unfaith Δ→llm':>20} {'delta':>9} {'conceal|foll':>13} judged")
+    print(f"monitor = {args.monitor} ({roster.get_entry(args.monitor).id}); "
+          f"{args.monitor} actor judged by {ALT}\n")
+    print(f"{'set':10} {'actor':22} {'baseline':>8} {'unfaith Δ→llm':>20} {'delta':>9} {'conceal|foll':>13} judged")
     results = {}
-    for setname, exp in SETS.items():
-        for actor in ACTORS:
-            cands = [p for p in sorted(TDIR.glob(f"{exp}_{actor}_*.jsonl")) if "_rejudged" not in p.name]
-            path = cands[0]
+    for setname, (exp, actors) in SETS.items():
+        for actor in actors:
+            path = _transcript(exp, actor)
+            if path is None:
+                print(f"{setname:10} {actor:22} [no transcript — skipped]")
+                continue
+            jm, jname = (alt_judge, ALT) if actor == args.monitor else (judge, args.monitor)
             old = _summ([json.loads(l) for l in path.read_text().splitlines() if l.strip()])
-            rows, n_judged = await rejudge_file(path, judge, sem, args.limit)
+            rows, n_judged = await rejudge_file(path, jm, sem, args.limit, judge_name=jname)
             new = _summ(rows)
             results[f"{setname}/{actor}"] = {"regex_v2": old, "llm": new, "n_judged": n_judged}
-            print(f"{setname:10} {actor:17} {new['baseline']:8.3f} "
+            print(f"{setname:10} {actor:22} {new['baseline']:8.3f} "
                   f"{old['unfaithful']:.3f}->{new['unfaithful']:.3f}      {new['delta']:+.3f}   "
                   f"{old['conceal_among_followers']:.3f}->{new['conceal_among_followers']:.3f}  {n_judged}")
             if not args.no_write:
