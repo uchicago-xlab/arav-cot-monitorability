@@ -226,6 +226,10 @@ def fig_paper_analog(*, experiment="exp_hints_sweep", suffix="", set_label="", p
                label="no mention (concealed)")
         acis = boot.get(a, {}).get("cis", {})
         for xi, c in zip(x, CONDS0):
+            if agg[c]["n"] == 0:                 # condition not measured (e.g. qwen3.5 no arithmetic complex)
+                ax.text(xi, 0.03, "not run", ha="center", va="bottom", fontsize=7,
+                        color="#999", style="italic", rotation=90)
+                continue
             take = conceal[xi] + mention[xi]
             n_take = agg[c]["conceal"] + agg[c]["mention"]
             frac = (agg[c]["mention"] / n_take) if n_take else None
