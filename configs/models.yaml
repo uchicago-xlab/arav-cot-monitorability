@@ -79,6 +79,17 @@ actors:
     experiments: [hints]                              # decode-necessity + §3.1 only for now
     no_cot_mechanism: vllm_structured                 # no-CoT arm = single-letter schema + chat_template_kwargs={enable_thinking:false} (prefill NOT honored here)
     notes: "Self-host vLLM 0.24.0 (OpenAI-compatible at VLLM_BASE_URL, key VLLM_API_KEY); re-enables the deferred qwen3_5_122b on a reliable endpoint. LIVE PROBE FINDINGS: (1) CoT returns in the OpenAI `reasoning` message field (NOT `reasoning_content`). (2) thinking DISABLE works via request extra_body={\"chat_template_kwargs\": {\"enable_thinking\": false}} (the kwarg `thinking` does NOT work; must be `enable_thinking`) -> `reasoning` goes to 0 chars. (3) assistant PREFILL (continue_final_message) is NOT honored on this endpoint (returns empty) -> the no-CoT arm CANNOT prefill. Therefore no_cot_mechanism=vllm_structured: the STRUCTURED single-letter schema PLUS enable_thinking:false (structured output alone still lets it reason in the `reasoning` channel; the disable kwarg is what makes it a true no-CoT arm)."
+  qwen3_32b_selfhost:                              # SELF-HOSTED vLLM Qwen3-32B (DENSE) — smaller sibling of qwen3_5_122b
+    id: openai-api/vllm/qwen3-32b                     # inspect `openai-api` provider: service `vllm` -> VLLM_BASE_URL + VLLM_API_KEY from env
+    provider: null                                    # self-host endpoint: NOT OpenRouter -> no provider-routing pin
+    cot_access: native_raw                            # raw faithful CoT in the `reasoning` field (Qwen3 hybrid-thinking, same as 122b)
+    reasoning_enabled: null                           # OpenRouter-only arg; N/A on the self-host path (thinking toggled via chat_template_kwargs)
+    tier: faithful_hints_gradient
+    necessity: todo                                   # NOT load-bearing until per-model necessity verified on-pod (CLAUDE.md guardrail)
+    uplift_set: null
+    experiments: [hints]                              # decode-necessity + §3.1
+    no_cot_mechanism: vllm_structured                 # no-CoT arm = single-letter schema + chat_template_kwargs={enable_thinking:false}
+    notes: "Self-host vLLM Qwen3-32B (DENSE, hybrid-thinking). Same self-host mechanics as qwen3_5_122b_selfhost: CoT in the `reasoning` field; thinking disabled via extra_body={chat_template_kwargs:{enable_thinking:false}}; prefill NOT honored -> vllm_structured no-CoT. Follow-up-C dense scale-ladder point below the 122b MoE."
   kimi_k2_thinking:                                  # Moonshot — independent faithful family (cross-lab robustness)
     id: openrouter/moonshotai/kimi-k2-thinking       # Kimi K2 Thinking (~1T MoE); OpenRouter catalog 2026-06-26
     provider: novita/bf16                            # bf16 endpoint (project pref bf16>fp8>int4); alts: atlas-cloud/int4, google-vertex

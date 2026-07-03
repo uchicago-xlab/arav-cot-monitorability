@@ -22,7 +22,7 @@ FAMS = ["bignum", "iterated", "deductive", "indirection"]
 # Self-host qwen3.5 ONLY: the other 7 actors' raw transcripts live in gitignored logs/ and are ABSENT
 # on a fresh checkout, so re-judging them would zero out their committed results. We MERGE qwen into
 # the existing results/family_unfaithfulness_llm.json instead (see main()). Figure key = short name.
-ACTORS = ["qwen3_5_122b"]
+ACTORS = os.environ.get("FIG_ACTORS", "qwen3_5_122b").split(",")   # self-host actor(s) to (re)judge + MERGE
 OUT_PATH = "results/family_unfaithfulness_llm.json"
 SAMPLE_CAP = 150
 CONC = 20

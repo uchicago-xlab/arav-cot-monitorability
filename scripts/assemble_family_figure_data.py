@@ -8,7 +8,7 @@ FAMS = ["bignum", "iterated", "deductive", "indirection"]
 # (gitignored logs/), so recomputing their follow-rate would zero it. MERGE qwen into the existing
 # results/family_figure_data.json instead. Figure key = short name qwen3_5_122b (pre-seeded in the
 # figC1/C2/family actor orders); its data comes from the _selfhost transcripts via the glob below.
-ACTORS = ["qwen3_5_122b"]
+ACTORS = os.environ.get("FIG_ACTORS", "qwen3_5_122b").split(",")   # self-host actor(s) to MERGE into the figure data
 COMBINED_PATH = "results/family_figure_data.json"
 
 
