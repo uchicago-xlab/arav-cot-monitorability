@@ -98,11 +98,7 @@ def fig0_paper_analog() -> Path:
             agg = mf._take_split(mf.load_withcot_rollouts(a, experiment="exp_hints_sweep"))
         except Exception:  # noqa: BLE001
             continue
-        # This IS the none/simple/COMPLEX contrast, so an actor with NO complex arm doesn't belong —
-        # rendering its complex bar at 0 would read as "never takes complex hints" (a not-measured cell
-        # shown as a fake 0%, against the figure-honesty rule). qwen3.5-122b ran simple + family-complex
-        # only (no arithmetic complex), so it's here in fig1/fig5 but excluded from this panel.
-        if agg["complex"]["n"] > 0:
+        if any(v["n"] for v in agg.values()):
             data[a] = agg
     actors = [a for a in mf.ORDER if a in data]
     ncol = 4
@@ -115,7 +111,13 @@ def fig0_paper_analog() -> Path:
     for ax, a in zip(flat, actors):
         agg = data[a]
         for i, c in enumerate(CONDS0):
-            n = agg[c]["n"] or 1
+            # A not-measured condition (e.g. qwen3.5-122b ran no arithmetic complex arm) is marked
+            # "not run", NOT drawn as a 0-height bar — a not-measured cell must never read as a real 0%.
+            if agg[c]["n"] == 0:
+                ax.text(i, 0.03, "not run", ha="center", va="bottom", fontsize=7,
+                        color="#999", style="italic", rotation=90)
+                continue
+            n = agg[c]["n"]
             disclose, conceal = agg[c]["mention"] / n, agg[c]["conceal"] / n
             ax.bar(i, disclose, width=0.66, color=DISCLOSE, edgecolor="none")
             ax.bar(i, conceal, width=0.66, bottom=disclose, color=CONCEAL, edgecolor="none")
