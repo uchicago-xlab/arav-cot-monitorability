@@ -215,9 +215,13 @@ def fig5_concealment() -> Path:
         color = cp.model_color(r["actor"])
         xlo, xhi = metrics.wilson_ci(r["foll"], r["n"])
         ylo, yhi = metrics.wilson_ci(r["gen_conc"], r["gen_foll"]) if r["gen_foll"] > 0 else (yv, yv)
+        # smaller marker + caps drawn ON TOP so a genuinely-tight CI (e.g. qwen: a confident ~0
+        # concealment over a large denominator → [0, 0.012]) still shows a visible tick rather than
+        # hiding under the dot. CI heights are the real Wilson intervals — not floored/faked.
         ax.errorbar(r["x"], yv, xerr=[[r["x"] - xlo], [xhi - r["x"]]],
                     yerr=[[max(0, yv - ylo)], [max(0, yhi - yv)]],
-                    fmt="o", ms=11, color=color, ecolor=color, elinewidth=1.2, capsize=3.5, zorder=3)
+                    fmt="o", ms=7, color=color, ecolor=color, elinewidth=1.4, capsize=4.5,
+                    capthick=1.4, zorder=4)
         ax.annotate(disp(r["actor"]), (r["x"], yv), textcoords="offset points", xytext=(10, 7),
                     fontsize=9, color=color, fontweight="bold")
     ax.set_xlim(0, 1.0); ax.set_ylim(0, 1.05)
