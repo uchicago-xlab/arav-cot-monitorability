@@ -226,9 +226,12 @@ def fig5_concealment() -> Path:
         color = cp.model_color(r["actor"])
         xlo, xhi = metrics.wilson_ci(r["foll"], r["n"])
         ylo, yhi = metrics.wilson_ci(r["gen_conc"], r["gen_foll"]) if r["gen_foll"] > 0 else (yv, yv)
+        # marker BELOW (semi-transparent), error bars ON TOP — so a tight CI whose whisker sits inside
+        # the marker radius (e.g. qwen3.5's near-zero concealment, +0.014) is still visible, not hidden.
+        ax.plot(r["x"], yv, "o", ms=11, color=color, alpha=0.85, zorder=3)
         ax.errorbar(r["x"], yv, xerr=[[r["x"] - xlo], [xhi - r["x"]]],
                     yerr=[[max(0, yv - ylo)], [max(0, yhi - yv)]],
-                    fmt="o", ms=11, color=color, ecolor=color, elinewidth=1.2, capsize=3.5, zorder=3)
+                    fmt="none", ecolor=color, elinewidth=1.4, capsize=4, zorder=4)
         ax.annotate(disp(r["actor"]), (r["x"], yv), textcoords="offset points", xytext=(10, 7),
                     fontsize=9, color=color, fontweight="bold")
     ax.set_xlim(0, 1.0); ax.set_ylim(0, 1.05)
