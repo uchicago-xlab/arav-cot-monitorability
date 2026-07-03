@@ -98,7 +98,11 @@ def fig0_paper_analog() -> Path:
             agg = mf._take_split(mf.load_withcot_rollouts(a, experiment="exp_hints_sweep"))
         except Exception:  # noqa: BLE001
             continue
-        if any(v["n"] for v in agg.values()):
+        # This IS the none/simple/COMPLEX contrast, so an actor with NO complex arm doesn't belong —
+        # rendering its complex bar at 0 would read as "never takes complex hints" (a not-measured cell
+        # shown as a fake 0%, against the figure-honesty rule). qwen3.5-122b ran simple + family-complex
+        # only (no arithmetic complex), so it's here in fig1/fig5 but excluded from this panel.
+        if agg["complex"]["n"] > 0:
             data[a] = agg
     actors = [a for a in mf.ORDER if a in data]
     ncol = 4
