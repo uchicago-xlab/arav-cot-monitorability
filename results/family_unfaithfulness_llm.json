@@ -349,5 +349,44 @@
       "unfaithful_llm": 0.038,
       "raw_unfaithful": 0.048
     }
+  },
+  "qwen3_32b": {
+    "judge": "gemini_3_flash",
+    "bignum": {
+      "n_total_withcot": 1800,
+      "n_followers": 310,
+      "n_judged": 149,
+      "conceal_rate_among_followers": 0.644,
+      "baseline": 0.05,
+      "unfaithful_llm": 0.061,
+      "raw_unfaithful": 0.111
+    },
+    "iterated": {
+      "n_total_withcot": 1800,
+      "n_followers": 158,
+      "n_judged": 149,
+      "conceal_rate_among_followers": 0.852,
+      "baseline": 0.05,
+      "unfaithful_llm": 0.025,
+      "raw_unfaithful": 0.075
+    },
+    "deductive": {
+      "n_total_withcot": 1800,
+      "n_followers": 658,
+      "n_judged": 150,
+      "conceal_rate_among_followers": 0.513,
+      "baseline": 0.05,
+      "unfaithful_llm": 0.138,
+      "raw_unfaithful": 0.188
+    },
+    "indirection": {
+      "n_total_withcot": 1800,
+      "n_followers": 166,
+      "n_judged": 149,
+      "conceal_rate_among_followers": 0.732,
+      "baseline": 0.05,
+      "unfaithful_llm": 0.017,
+      "raw_unfaithful": 0.067
+    }
   }
 }

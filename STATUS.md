@@ -104,6 +104,18 @@ Per-model — **live · reasoning · prefill** (provider in parens):
   - `gemini_3_1_pro` (google-vertex) — summary trace → **generalization-only headline** (caveated, judged body only), not a faithful actor.
 
 ## Drift log (deviations from SPEC/CLAUDE — read first)
+- **qwen3-32b (dense) added as a 9th decode/family actor + scatter error bars (2026-07-03, Session #10).**
+  Pulled the branch's new `decode_necessity_qwen3_32b.json` (has `emit_*`) and merged ONLY its
+  `qwen3_32b` entry into `family_unfaithfulness_llm.json` + `family_figure_data.json` (kept main's
+  `gpt_oss_120b_selfhost`); added `qwen3_32b` to the decode/family figure lists (`DECODE_ORDER`,
+  `make_complex.ACTOR_ORDER`, `make_family._ALL`, `assemble.ACTORS`). qwen3-32b now shows in figC1/figC2
+  (+ answered-only) and the family bars/scatter. **The `3p1_family_sweep` scatter now has error bars**
+  (Arav's "do the same thing as fig5"): x = Wilson-diff CI on the POOLED answered-only decode counts,
+  y = Wilson CI on the LLM concealment rate (`n_judged`) scaled by the follow-rate; markers below,
+  bars on top (as in fig5). x-axis stays the **answered-only** necessity (NOT the branch scatter's
+  all-rollout necessity). `answered_necessity()` now pools levels + returns counts. qwen3-32b has no
+  arithmetic sweep transcript locally → absent from fig0/1/5 (decode/family only), like the other
+  non-arithmetic actors.
 - **qwen3.5-122b (self-host vLLM) LANDED ON MAIN + figures regenerated (2026-07-02, Session #10).** The
   qwen3.5 self-host §3.1 run (decode-necessity + 4-family unfaithfulness, W&B runs stoic-rain-86 /
   noble-vortex-87…stellar-sun-90; branch `feat/qwen35-selfhost-vllm`) finished. To get it onto `main`
