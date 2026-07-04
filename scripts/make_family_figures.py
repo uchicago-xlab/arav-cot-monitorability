@@ -16,13 +16,13 @@ from cot_mon import metrics          # Wilson / Newcombe CIs for the scatter err
 
 DATA = json.load(open("results/family_figure_data.json"))
 OUT = Path("figures/3p1_family_sweep"); OUT.mkdir(parents=True, exist_ok=True)
-_ALL = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "opus_4_8_direct", "gpt_oss_120b_selfhost", "deepseek_v4_flash", "qwen3_5_122b", "qwen3_32b"]
+_ALL = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "opus_4_8_direct", "gpt_oss_120b_selfhost", "deepseek_v4_flash", "qwen3_5_122b", "qwen3_32b", "olmo3_32b"]
 ACTORS = [a for a in _ALL if DATA.get(a)]   # robust: only actors with data (deepseek appears once judged)
 LABEL = {"gemini_2_5_flash": "gemini-2.5-flash", "gemini_3_flash": "gemini-3-flash",
          "gemini_3_5_flash": "gemini-3.5-flash", "gpt_5_5": "gpt-5.5",
          "opus_4_8_direct": "opus-4.8",
          "gpt_oss_120b_selfhost": "gpt-oss-120b", "deepseek_v4_flash": "deepseek-v4-flash",
-         "qwen3_5_122b": "qwen3.5-122b", "qwen3_32b": "qwen3-32b"}
+         "qwen3_5_122b": "qwen3.5-122b", "qwen3_32b": "qwen3-32b", "olmo3_32b": "olmo3-32b"}
 FAMS = ["bignum", "iterated", "deductive", "indirection"]
 
 cp.set_style()

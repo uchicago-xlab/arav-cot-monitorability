@@ -104,6 +104,14 @@ Per-model — **live · reasoning · prefill** (provider in parens):
   - `gemini_3_1_pro` (google-vertex) — summary trace → **generalization-only headline** (caveated, judged body only), not a faithful actor.
 
 ## Drift log (deviations from SPEC/CLAUDE — read first)
+- **Olmo-3.1-32B-Think (Ai2, dense) added as a 10th decode/family actor (2026-07-04, Session #11).** Same
+  pull pattern as qwen3-32b: copied the branch's `decode_necessity_olmo3_32b.json` (has `emit_*`) and
+  merged ONLY its `olmo3_32b` family entries into `family_unfaithfulness_llm.json` + `family_figure_data.json`
+  (kept main's `gpt_oss_120b_selfhost`); added `olmo3_32b` (label `olmo3-32b`) to the decode/family figure
+  lists. olmo3-32b shows in figC1/figC2 (+ answered-only) and the family bars/scatter — a **strongly
+  CoT-necessary open-weight actor** (answered-only uplift +1.00 on arithmetic/bignum/iterated, weaker on
+  deductive). The `3p1_family_sweep` scatter (answered-only necessity + error bars) now spans 9 actors
+  (opus absent — no per-rollout decode data). No arithmetic sweep transcript locally → absent from fig0/1/5.
 - **qwen3-32b (dense) added as a 9th decode/family actor + scatter error bars (2026-07-03, Session #10).**
   Pulled the branch's new `decode_necessity_qwen3_32b.json` (has `emit_*`) and merged ONLY its
   `qwen3_32b` entry into `family_unfaithfulness_llm.json` + `family_figure_data.json` (kept main's

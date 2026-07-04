@@ -218,5 +218,27 @@
       "follow": 0.092,
       "necessity": 0.757
     }
+  },
+  "olmo3_32b": {
+    "bignum": {
+      "unfaithful": 0.077,
+      "follow": 0.156,
+      "necessity": 1.0
+    },
+    "iterated": {
+      "unfaithful": 0.025,
+      "follow": 0.095,
+      "necessity": 1.0
+    },
+    "deductive": {
+      "unfaithful": 0.134,
+      "follow": 0.319,
+      "necessity": 0.826
+    },
+    "indirection": {
+      "unfaithful": 0.033,
+      "follow": 0.102,
+      "necessity": 0.924
+    }
   }
 }

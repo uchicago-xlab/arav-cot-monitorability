@@ -31,12 +31,12 @@ import matplotlib.pyplot as plt  # noqa: E402
 from cot_mon import figviz  # noqa: E402
 
 ACTOR_ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "opus_4_8_direct",
-               "gpt_oss_120b_selfhost", "deepseek_v4_flash", "qwen3_5_122b", "qwen3_32b"]
+               "gpt_oss_120b_selfhost", "deepseek_v4_flash", "qwen3_5_122b", "qwen3_32b", "olmo3_32b"]
 ACTOR_LABEL = {"gemini_2_5_flash": "gemini-2.5-flash", "gemini_3_flash": "gemini-3-flash",
                "gemini_3_5_flash": "gemini-3.5-flash", "gpt_5_5": "gpt-5.5", "opus_4_8_direct": "opus-4.8",
                "gpt_oss_120b_selfhost": "gpt-oss-120b",
                "deepseek_v4_flash": "deepseek-v4-flash", "qwen3_5_122b": "qwen3.5-122b",
-               "qwen3_32b": "qwen3-32b"}
+               "qwen3_32b": "qwen3-32b", "olmo3_32b": "olmo3-32b"}
 FAMILY_ORDER = ["arithmetic", "bignum", "iterated", "deductive", "indirection"]
 LEVELS = ["L1", "L2", "L3"]
 FIGDIR = Path("figures/3p1_complex_hints")
