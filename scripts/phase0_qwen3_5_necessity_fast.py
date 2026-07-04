@@ -31,7 +31,8 @@ async def main(args):
     e = roster.get_entry(args.actor)
     cs = roster.judged_cot_source(e.cot_access)
     ncm = e.no_cot_mechanism           # vllm_structured for the self-host actor (prefill is NOT honored on vLLM)
-    model = roster.build_model(args.actor, config=GenerateConfig(temperature=args.temperature, max_tokens=args.max_tokens))
+    model = roster.build_model(args.actor, config=GenerateConfig(temperature=args.temperature, max_tokens=args.max_tokens,
+                                                                 max_connections=args.concurrency))  # match pool to semaphore (else throttled)
     items = data.load_gpqa(n=args.n)
     print(f"=== {args.actor} CONCURRENT necessity re-probe (n={args.n}x{args.samples}, conc={args.concurrency}, "
           f"no_cot={ncm}, max_tokens={args.max_tokens}) ===", flush=True)

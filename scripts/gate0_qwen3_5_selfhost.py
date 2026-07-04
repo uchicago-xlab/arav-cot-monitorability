@@ -39,7 +39,8 @@ async def main(args):
     cs = roster.judged_cot_source(e.cot_access)             # "reasoning" for native_raw qwen
     ncm = e.no_cot_mechanism                                # "vllm_structured"
     model = roster.build_model(args.actor, config=GenerateConfig(
-        temperature=args.temperature, top_p=args.top_p, max_tokens=args.max_tokens, seed=args.seed))
+        temperature=args.temperature, top_p=args.top_p, max_tokens=args.max_tokens, seed=args.seed,
+        max_connections=args.concurrency))   # match Inspect's HTTP pool to the semaphore (else throttled ~10-20)
     items = data.load_gpqa(n=args.n)
     print(f"=== GATE 0: {args.actor} (cot_access={e.cot_access}, cot_source={cs}, no_cot={ncm}) ===", flush=True)
     print(f"    n={args.n} items x {args.samples} samples/arm, temp={args.temperature}, top_p={args.top_p}, "

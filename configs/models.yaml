@@ -90,6 +90,17 @@ actors:
     experiments: [hints]                              # decode-necessity + §3.1
     no_cot_mechanism: vllm_structured                 # no-CoT arm = single-letter schema + chat_template_kwargs={enable_thinking:false}
     notes: "Self-host vLLM Qwen3-32B (DENSE, hybrid-thinking). Same self-host mechanics as qwen3_5_122b_selfhost: CoT in the `reasoning` field; thinking disabled via extra_body={chat_template_kwargs:{enable_thinking:false}}; prefill NOT honored -> vllm_structured no-CoT. Follow-up-C dense scale-ladder point below the 122b MoE."
+  olmo3_32b_think_selfhost:                          # SELF-HOSTED vLLM Olmo-3.1-32B-Think (DENSE) — cross-lab (Ai2), fully-open reasoner
+    id: openai-api/vllm/olmo3-32b                     # inspect `openai-api` provider: service `vllm` -> VLLM_BASE_URL + VLLM_API_KEY from env
+    provider: null                                    # self-host endpoint: NOT OpenRouter -> no provider-routing pin
+    cot_access: native_raw                            # raw <think> CoT in the `reasoning` field via --reasoning-parser olmo3 (verified live)
+    reasoning_enabled: null                           # N/A on the self-host path
+    tier: faithful_hints_gradient
+    necessity: todo                                   # NOT load-bearing until per-model necessity verified on-pod (CLAUDE.md guardrail)
+    uplift_set: null
+    experiments: [hints]                              # decode-necessity + §3.1
+    no_cot_mechanism: vllm_prefill_think              # no-CoT arm = prefill `<think></think>\n\n<answer>` + continue_final_message
+    notes: "Self-host vLLM allenai/Olmo-3.1-32B-Think (DENSE reasoner, Ai2 — adds an independent fully-open lab family). LIVE PROBE FINDINGS (vLLM 0.24.0, B200): (1) raw <think> CoT returns in the `reasoning` field with --reasoning-parser olmo3 (median/max CoT measured on-pod). (2) Olmo has NO enable_thinking toggle and its stock template FORCE-OPENS <think> every turn; a bare enable_thinking:false (even with a patched template that emits a closed <think></think>) does NOT stop it — the model reasons in prose and the olmo3 parser misroutes it into `reasoning` (rtoks stays >0). (3) The TRUE off switch (rtoks=0, verified on hard GPQA) is no_cot_mechanism=vllm_prefill_think: prefill the assistant turn `<think></think>\\n\\n<answer>` and CONTINUE it via extra_body={continue_final_message:true, add_generation_prompt:false} (the openai-api provider does NOT auto-set these for a trailing assistant msg, so solver passes them). Served with --chat-template selfhost_vllm/olmo3_think_nothink.jinja (patched to honor enable_thinking for the WITH-CoT arm's asymmetry). Prefill family -> comparable to the OpenRouter prefill actors."
   kimi_k2_thinking:                                  # Moonshot — independent faithful family (cross-lab robustness)
     id: openrouter/moonshotai/kimi-k2-thinking       # Kimi K2 Thinking (~1T MoE); OpenRouter catalog 2026-06-26
     provider: novita/bf16                            # bf16 endpoint (project pref bf16>fp8>int4); alts: atlas-cloud/int4, google-vertex

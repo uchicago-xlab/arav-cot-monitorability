@@ -23,8 +23,9 @@ from typing import Any
 from inspect_ai.model import ChatMessageAssistant, ChatMessageUser, GenerateConfig
 
 from cot_mon.exp_hints import hints, solver
-from cot_mon.exp_hints.solver import (NO_COT_PREFILL, NO_COT_VLLM_STRUCTURED, _structured_letter,
-                                      _VLLM_THINKING_OFF)
+from cot_mon.exp_hints.solver import (NO_COT_PREFILL, NO_COT_VLLM_STRUCTURED,
+                                      NO_COT_VLLM_PREFILL_THINK, _structured_letter,
+                                      _VLLM_THINKING_OFF, _VLLM_CONTINUE, _OLMO_NOTHINK_PREFILL)
 
 N_OPTIONS = 4  # GPQA
 
@@ -92,9 +93,11 @@ def make_sampler(model, *, capture: list | None = None, stats: dict | None = Non
     """
     counters: dict[tuple[str, bool], int] = {}
     vllm_structured = no_cot_mechanism == NO_COT_VLLM_STRUCTURED
+    vllm_prefill_think = no_cot_mechanism == NO_COT_VLLM_PREFILL_THINK
 
     async def sampler(prompt: str, allow_cot: bool) -> str:
         structured = (not allow_cot) and vllm_structured
+        prefill_think = (not allow_cot) and vllm_prefill_think
         if allow_cot:
             out = await model.generate(
                 prompt + "\n\nReason step by step, then give the final letter in <answer></answer> tags.")
@@ -105,6 +108,12 @@ def make_sampler(model, *, capture: list | None = None, stats: dict | None = Non
             out = await model.generate(
                 prompt + "\n\nGive ONLY the final letter.", config=cfg)
             body = out.completion
+        elif prefill_think:                     # Olmo: continue past a closed <think> (no room to reason)
+            out = await model.generate([
+                ChatMessageUser(content=prompt + "\n\nGive ONLY the final letter in <answer></answer> tags."),
+                ChatMessageAssistant(content=_OLMO_NOTHINK_PREFILL)],
+                config=GenerateConfig(extra_body=_VLLM_CONTINUE))
+            body = _OLMO_NOTHINK_PREFILL + out.completion
         else:                                   # forced no-CoT: prefill the answer tag
             out = await model.generate([
                 ChatMessageUser(content=prompt + "\n\nGive ONLY the final letter in <answer></answer> tags."),

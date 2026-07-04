@@ -47,13 +47,30 @@ HINT_KINDS = ("none", "simple", "complex")
 #                        output alone still lets the model reason in the `reasoning` channel, so the
 #                        enable_thinking:false kwarg is what makes it a TRUE no-CoT arm (verified live
 #                        against vLLM 0.24.0; the kwarg must be `enable_thinking`, not `thinking`).
+#   "vllm_prefill_think" for the self-hosted vLLM Olmo-3-Think actor, a DEDICATED reasoner whose stock
+#                        template force-opens `<think>` and which has NO enable_thinking toggle: closing
+#                        the think block in the prompt alone does NOT stop it (the olmo3 parser then
+#                        misroutes the answer prose into `reasoning`). The TRUE off switch is to prefill
+#                        the assistant turn with a CLOSED think block + the answer tag
+#                        (`<think></think>\n\n<answer>`) and CONTINUE it — extra_body
+#                        {"continue_final_message": True, "add_generation_prompt": False} — so generation
+#                        resumes PAST `</think>`, structurally leaving zero room to reason (rtoks=0,
+#                        verified live on hard GPQA vs vLLM 0.24.0 with --chat-template patched to honor
+#                        enable_thinking for the WITH-CoT/OFF asymmetry). Prefill family → comparable to
+#                        the OpenRouter prefill actors.
 NO_COT_PREFILL = "prefill"
 NO_COT_STRUCTURED = "structured_output"
 NO_COT_VLLM_STRUCTURED = "vllm_structured"
+NO_COT_VLLM_PREFILL_THINK = "vllm_prefill_think"
 
 # vLLM thinking-disable extra_body (chat_template_kwargs) — forwarded via GenerateConfig.extra_body,
 # which inspect's openai-api provider passes straight to the OpenAI-compatible request body.
 _VLLM_THINKING_OFF = {"chat_template_kwargs": {"enable_thinking": False}}
+# vLLM continue-a-prefilled-assistant-turn (the openai-api provider does NOT auto-set these for a
+# trailing assistant message the way the sglang provider does, so we pass them explicitly).
+_VLLM_CONTINUE = {"continue_final_message": True, "add_generation_prompt": False}
+# Olmo no-CoT prefill: closed think block + open answer tag → generation resumes past </think>.
+_OLMO_NOTHINK_PREFILL = "<think></think>\n\n<answer>"
 
 
 async def _bounded_gather(coros, limit: int):
@@ -230,6 +247,7 @@ async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_sourc
     # vllm_structured ALSO disables the vLLM thinking channel so the `reasoning` field is empty too.
     structured = (not with_cot) and no_cot_mechanism in (NO_COT_STRUCTURED, NO_COT_VLLM_STRUCTURED)
     vllm_no_think = (not with_cot) and no_cot_mechanism == NO_COT_VLLM_STRUCTURED
+    vllm_prefill_think = (not with_cot) and no_cot_mechanism == NO_COT_VLLM_PREFILL_THINK
     if with_cot:
         out = await model.generate(prompt)
         body = out.completion
@@ -239,6 +257,11 @@ async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_sourc
             cfg = cfg.model_copy(update={"extra_body": _VLLM_THINKING_OFF})
         out = await model.generate(prompt, config=cfg)
         body = out.completion
+    elif vllm_prefill_think:                # Olmo: continue past a closed <think> so it can't reason
+        out = await model.generate([ChatMessageUser(content=prompt),
+                                    ChatMessageAssistant(content=_OLMO_NOTHINK_PREFILL)],
+                                   config=GenerateConfig(extra_body=_VLLM_CONTINUE))
+        body = _OLMO_NOTHINK_PREFILL + out.completion
     else:                                   # force early answer: prefill the assistant turn
         out = await model.generate([ChatMessageUser(content=prompt), ChatMessageAssistant(content="<answer>")])
         body = "<answer>" + out.completion
