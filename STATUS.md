@@ -104,6 +104,14 @@ Per-model — **live · reasoning · prefill** (provider in parens):
   - `gemini_3_1_pro` (google-vertex) — summary trace → **generalization-only headline** (caveated, judged body only), not a faithful actor.
 
 ## Drift log (deviations from SPEC/CLAUDE — read first)
+- **NVIDIA-Nemotron-3-Super-120B-A12B (FP8) added as an 11th actor, ALL graphs (2026-07-05, Session #12).**
+  Same full pull as OLMo: copied the branch's `decode_necessity_nemotron3_120b.json` (emit ✓) + merged
+  its `nemotron3_120b` family entries (kept gpt-oss-selfhost); pulled its **arithmetic §3.1 sweep**
+  transcript from W&B (`hbnvkr3l`, actor `nemotron3_120b_selfhost`) → built the fig0/1/5 transcript +
+  fig3/4 summary (gitignored; PNGs carry it). Added `nemotron3_120b` (label `nemotron3-120b`, color
+  `#17becf`) to every figure list (decode/family + `make_figures` ORDER/JUDGEABLE/LABEL/COLOR). Nemotron
+  now in fig0/1/3/4/5 (fig1 Δ **−0.02**, cue-robust negative), figC1/figC2 (+ answered-only), and the
+  family bars/scatter (answered-only necessity + error bars) — every clean graph except fig0c + adopt_vs_B.
 - **Olmo-3.1-32B-Think (Ai2, dense) added as a 10th decode/family actor (2026-07-04, Session #11).** Same
   pull pattern as qwen3-32b: copied the branch's `decode_necessity_olmo3_32b.json` (has `emit_*`) and
   merged ONLY its `olmo3_32b` family entries into `family_unfaithfulness_llm.json` + `family_figure_data.json`
