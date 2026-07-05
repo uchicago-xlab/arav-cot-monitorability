@@ -111,7 +111,14 @@ Per-model — **live · reasoning · prefill** (provider in parens):
   lists. olmo3-32b shows in figC1/figC2 (+ answered-only) and the family bars/scatter — a **strongly
   CoT-necessary open-weight actor** (answered-only uplift +1.00 on arithmetic/bignum/iterated, weaker on
   deductive). The `3p1_family_sweep` scatter (answered-only necessity + error bars) now spans 9 actors
-  (opus absent — no per-rollout decode data). No arithmetic sweep transcript locally → absent from fig0/1/5.
+  (opus absent — no per-rollout decode data). **Then added OLMo to ALL clean graphs** (2026-07-04):
+  pulled its **arithmetic §3.1 sweep** transcript from W&B (`tpjfh3w6` olive-rain-105, actor
+  `olmo3_32b_think_selfhost`; none/simple/complex_arithmetic, both arms) → built
+  `logs/transcripts/exp_hints_sweep_olmo3_32b_tpjfh3w6.jsonl` + `logs/sweep_olmo3_32b.json` (gitignored;
+  PNGs carry it, re-pull from W&B for a fresh regen), and added `olmo3_32b` to `make_figures`
+  ORDER/JUDGEABLE/LABEL/ACTOR_COLOR (`#8c564b`). OLMo now in fig0 (real none/simple/complex arithmetic),
+  fig1 (Δ −0.01, cue-robust negative), fig3/fig4 (follow-rate), fig5 — i.e. every clean graph except
+  fig0c (gemini-2.5-only) and adopt_vs_B (§3.2, no OLMo data).
 - **qwen3-32b (dense) added as a 9th decode/family actor + scatter error bars (2026-07-03, Session #10).**
   Pulled the branch's new `decode_necessity_qwen3_32b.json` (has `emit_*`) and merged ONLY its
   `qwen3_32b` entry into `family_unfaithfulness_llm.json` + `family_figure_data.json` (kept main's
