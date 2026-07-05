@@ -164,6 +164,11 @@ def build_model(
         # The vLLM thinking toggle / structured no-CoT arm rides on GenerateConfig.extra_body at generate
         # time (see exp_hints/solver.py NO_COT_VLLM_STRUCTURED), not on a model arg here.
         margs: dict[str, Any] = dict(extra_model_args)
+        # Self-host has NO external rate limit but long CoT gens (heavy reasoners like nemotron3/olmo
+        # at high concurrency ~40 tok/s/seq) can take >10min and blow the OpenAI client's 600s default
+        # -> APITimeoutError -> Inspect retry-storm that abandons+loses the longest (most CoT-necessary)
+        # rollouts. Raise the httpx client timeout so those complete on the first attempt.
+        margs.setdefault("client_timeout", 2400.0)
         return get_model(e.id, config=cfg, **margs)
     if e.id.startswith("anthropic/"):
         # Opus 4.8 (and the 4.6+/Fable family) REJECT temperature/top_p/top_k with a 400 — strip

@@ -234,7 +234,7 @@ def fig5_concealment() -> Path:
 
 # ── C1. DECODE-UPLIFT by family (clean horizontal small-multiples) ────────────────────────────────
 DECODE_ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",
-                "gpt_oss_120b", "deepseek_v4_flash", "qwen3_32b", "qwen3_5_122b", "olmo3_32b"]
+                "gpt_oss_120b", "deepseek_v4_flash", "qwen3_32b", "qwen3_5_122b", "olmo3_32b", "nemotron3_120b"]
 
 
 def _decode_cells() -> dict:

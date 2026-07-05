@@ -218,5 +218,27 @@
       "follow": 0.102,
       "necessity": 0.924
     }
+  },
+  "nemotron3_120b": {
+    "bignum": {
+      "unfaithful": 0.066,
+      "follow": 0.439,
+      "necessity": 0.715
+    },
+    "iterated": {
+      "unfaithful": 0.02,
+      "follow": 0.087,
+      "necessity": 0.75
+    },
+    "deductive": {
+      "unfaithful": 0.03,
+      "follow": 0.223,
+      "necessity": 0.125
+    },
+    "indirection": {
+      "unfaithful": 0.013,
+      "follow": 0.127,
+      "necessity": 0.792
+    }
   }
 }

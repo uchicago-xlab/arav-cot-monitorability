@@ -101,6 +101,17 @@ actors:
     experiments: [hints]                              # decode-necessity + §3.1
     no_cot_mechanism: vllm_prefill_think              # no-CoT arm = prefill `<think></think>\n\n<answer>` + continue_final_message
     notes: "Self-host vLLM allenai/Olmo-3.1-32B-Think (DENSE reasoner, Ai2 — adds an independent fully-open lab family). LIVE PROBE FINDINGS (vLLM 0.24.0, B200): (1) raw <think> CoT returns in the `reasoning` field with --reasoning-parser olmo3 (median/max CoT measured on-pod). (2) Olmo has NO enable_thinking toggle and its stock template FORCE-OPENS <think> every turn; a bare enable_thinking:false (even with a patched template that emits a closed <think></think>) does NOT stop it — the model reasons in prose and the olmo3 parser misroutes it into `reasoning` (rtoks stays >0). (3) The TRUE off switch (rtoks=0, verified on hard GPQA) is no_cot_mechanism=vllm_prefill_think: prefill the assistant turn `<think></think>\\n\\n<answer>` and CONTINUE it via extra_body={continue_final_message:true, add_generation_prompt:false} (the openai-api provider does NOT auto-set these for a trailing assistant msg, so solver passes them). Served with --chat-template selfhost_vllm/olmo3_think_nothink.jinja (patched to honor enable_thinking for the WITH-CoT arm's asymmetry). Prefill family -> comparable to the OpenRouter prefill actors."
+  nemotron3_120b_selfhost:                           # SELF-HOSTED vLLM NVIDIA-Nemotron-3-Super-120B-A12B (FP8) — cross-lab (NVIDIA), 120B-total/12B-active hybrid Mamba-MoE
+    id: openai-api/vllm/nemotron3-120b                # inspect `openai-api` provider: service `vllm` -> VLLM_BASE_URL + VLLM_API_KEY from env
+    provider: null                                    # self-host endpoint: NOT OpenRouter -> no provider-routing pin
+    cot_access: native_raw                            # raw reasoning trace in the `reasoning` field via --reasoning-parser nemotron_v3 (verify live)
+    reasoning_enabled: null                           # N/A on the self-host path (thinking toggled via chat_template_kwargs)
+    tier: faithful_hints_gradient
+    necessity: todo                                   # NOT load-bearing until per-model necessity verified on-pod (CLAUDE.md guardrail)
+    uplift_set: null
+    experiments: [hints]                              # decode-necessity + §3.1
+    no_cot_mechanism: vllm_structured                 # SAME as qwen: single-letter schema + chat_template_kwargs={enable_thinking:false} (Nemotron-3 has a native enable_thinking toggle)
+    notes: "Self-host vLLM nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 (120B total / 12B active, hybrid LatentMoE = interleaved Mamba-2 + MoE + Attention; NVIDIA-provided FP8 checkpoint -> no runtime quant; fits one B200). Adds an independent NVIDIA lab family; 12B-active = fast. Nemotron-3 has a NATIVE enable_thinking toggle (unlike Olmo) -> reuses the qwen `vllm_structured` no-CoT arm: single-letter schema + extra_body={chat_template_kwargs:{enable_thinking:false}}. Served with --reasoning-parser nemotron_v3. VERIFY on-pod: (1) raw CoT in the `reasoning` field, (2) enable_thinking:false -> rtoks=0, (3) per-model necessity."
   kimi_k2_thinking:                                  # Moonshot — independent faithful family (cross-lab robustness)
     id: openrouter/moonshotai/kimi-k2-thinking       # Kimi K2 Thinking (~1T MoE); OpenRouter catalog 2026-06-26
     provider: novita/bf16                            # bf16 endpoint (project pref bf16>fp8>int4); alts: atlas-cloud/int4, google-vertex
