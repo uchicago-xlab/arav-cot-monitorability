@@ -19,6 +19,11 @@
       "unfaithful": 0.012,
       "follow": 0.085,
       "necessity": 0.744
+    },
+    "arithmetic": {
+      "unfaithful": 0.0,
+      "follow": 0.031,
+      "necessity": 0.775
     }
   },
   "gemini_3_flash": {
@@ -41,6 +46,11 @@
       "unfaithful": 0.0,
       "follow": 0.182,
       "necessity": 0.724
+    },
+    "arithmetic": {
+      "unfaithful": 0.0,
+      "follow": 0.124,
+      "necessity": 0.826
     }
   },
   "gemini_3_5_flash": {
@@ -63,6 +73,11 @@
       "unfaithful": 0.0,
       "follow": 0.262,
       "necessity": 0.688
+    },
+    "arithmetic": {
+      "unfaithful": 0.002,
+      "follow": 0.196,
+      "necessity": 0.889
     }
   },
   "gpt_5_5": {
@@ -85,6 +100,11 @@
       "unfaithful": 0.055,
       "follow": 0.199,
       "necessity": 0.817
+    },
+    "arithmetic": {
+      "unfaithful": 0.0,
+      "follow": 0.094,
+      "necessity": 0.812
     }
   },
   "opus_4_8_direct": {
@@ -107,6 +127,11 @@
       "unfaithful": 0.0,
       "follow": 0.555,
       "necessity": 0.746
+    },
+    "arithmetic": {
+      "unfaithful": 0.003,
+      "follow": 0.535,
+      "necessity": 0.731
     }
   },
   "gpt_oss_120b": {
@@ -173,6 +198,11 @@
       "unfaithful": 0.005,
       "follow": 0.041,
       "necessity": 0.994
+    },
+    "arithmetic": {
+      "unfaithful": 0.008,
+      "follow": 0.128,
+      "necessity": 0.993
     }
   },
   "qwen3_5_122b": {
@@ -217,6 +247,11 @@
       "unfaithful": 0.017,
       "follow": 0.092,
       "necessity": 0.757
+    },
+    "arithmetic": {
+      "unfaithful": 0.049,
+      "follow": 0.147,
+      "necessity": 0.632
     }
   },
   "olmo3_32b": {
@@ -239,6 +274,11 @@
       "unfaithful": 0.033,
       "follow": 0.102,
       "necessity": 0.924
+    },
+    "arithmetic": {
+      "unfaithful": 0.017,
+      "follow": 0.104,
+      "necessity": 0.993
     }
   },
   "nemotron3_120b": {
@@ -261,6 +301,11 @@
       "unfaithful": 0.013,
       "follow": 0.127,
       "necessity": 0.792
+    },
+    "arithmetic": {
+      "unfaithful": 0.023,
+      "follow": 0.127,
+      "necessity": 0.771
     }
   }
 }
