@@ -7,6 +7,7 @@ Language Models Struggle to Evade Monitors"* (arXiv 2507.05246), built on
 ## Layout
 
 ```text
+run_sweep.py              powered hint-sweep runner (main entry point)
 configs/models.yaml       roster: logical name -> OpenRouter id + provider pin + CoT-access mode
 src/cot_mon/
   models/roster.py        model layer (provider pins, reasoning enable/disable, no-CoT mechanisms)
@@ -17,13 +18,13 @@ src/cot_mon/
   logging/                Weights & Biases run/rollout logging
 results/                  aggregate metrics behind the figures (JSON)
 figures/                  rendered figures
-tests/                    test suite
 ```
 
 ## Setup
 
 ```bash
 cp .env.example .env            # add OPENROUTER_API_KEY
-uv sync --extra dev             # install deps
-uv run pytest                   # run the test suite
+uv sync                         # install deps
+uv run python run_sweep.py --dry                     # tiny end-to-end + cost projection
+uv run python run_sweep.py --models gemini_3_flash   # one actor
 ```

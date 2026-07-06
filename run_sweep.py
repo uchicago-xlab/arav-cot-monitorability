@@ -7,9 +7,9 @@ across conditions; no-hint baseline subtracted; per-cell decode-necessity from t
 aware capture (reasoning field for native_raw). L1 = the core replication; L2/L3 = within-family
 extension. Everything logs to W&B (per-rollout CoT table + transcripts.jsonl + Wilson-2σ scalars).
 
-  uv run python scripts/run_sweep.py --dry                      # tiny end-to-end + cost projection
-  uv run python scripts/run_sweep.py                            # full 60x10, all actors
-  uv run python scripts/run_sweep.py --models gemini_3_flash    # one actor
+  uv run python run_sweep.py --dry                      # tiny end-to-end + cost projection
+  uv run python run_sweep.py                            # full 60x10, all actors
+  uv run python run_sweep.py --models gemini_3_flash    # one actor
 """
 import argparse
 import asyncio
@@ -23,7 +23,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # Channel-disabled Gemini actors emit an empty `reasoning.text` detail that inspect_ai's strict
 # pydantic model rejects; it's a caught warning (the body `.completion` we judge is unaffected), but
