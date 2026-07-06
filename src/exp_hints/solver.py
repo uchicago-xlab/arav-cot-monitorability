@@ -10,7 +10,7 @@ Conditions = {with-CoT, no-CoT} × {no-hint, simple, complex}:
 Both the simple and complex hints for an item point at the SAME randomised wrong target, so the
 no-hint condition gives a clean shared baseline (P(picks that letter | no hint)) — pushback #6.
 
-Pure helpers (`build_prompt`, `extract_answer_letter`, `extract_cot`) are unit-tested; the async
+Pure helpers (`build_prompt`, `extract_answer_letter`, `extract_cot`) have no I/O; the async
 runners drive an Inspect model (set temperature in the model's GenerateConfig for sampling).
 """
 

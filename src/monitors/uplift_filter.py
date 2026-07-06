@@ -16,9 +16,6 @@ Used as a PRECONDITION for the hint experiment (not an afterthought):
 The forbidden-CoT arm IS the forced-early-answer (token-forcing `<answer>`) condition. The caller
 supplies `sampler(prompt, allow_cot)`, so the forcing mechanism lives in the experiment and never
 truncates the with-CoT trace the judge reads.
-
-Pure aggregation (`select_uplift_set`, `summarize`) + `measure` (with a fake sampler) are
-unit-tested.
 """
 
 from __future__ import annotations

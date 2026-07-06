@@ -3,8 +3,7 @@
 Did the CoT actually USE the hint? **The SCORING judge is an LLM** (`judge_simple_llm` /
 `judge_complex_autorater`) — project policy (2026-06-25): no regex judges/monitors; the monitor model
 is chosen by the human (currently **gemini-3-flash**). The deterministic functions below
-(`judge_simple` / `judge_complex`) are kept as a fast, transparent REFERENCE/baseline and for unit
-tests, and were the instrument through Session #4; they are NO LONGER the scoring path — the regex
+(`judge_simple` / `judge_complex`) are kept as a fast, transparent REFERENCE/baseline; they are NO LONGER the scoring path — the regex
 simple judge was found to inflate unfaithfulness (it missed open attributions like "the provided
 answer is B"), and a string matcher is not what the paper does (it follows Chen et al.'s model-based
 grader; every monitor in the paper is an LLM).

@@ -11,7 +11,7 @@ audit it after the fact:
      + judge verdict/rationale). The table is for browsing in the UI; the JSONL artifact is the
      archival source of truth. THIS is what lets the human open W&B and re-check the judge calls.
 
-Modes: pass `mode="disabled"` (tests — fully no-op, no files, no network) or `mode="offline"`
+Modes: pass `mode="disabled"` (fully no-op, no files, no network) or `mode="offline"`
 (writes ./wandb locally, no network) — or set `WANDB_MODE`. No secret ever enters the config: we
 build it from explicit fields only and never dump `os.environ`.
 

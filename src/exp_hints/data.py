@@ -9,7 +9,7 @@ Normalises both into `MCQItem` (question + options + correct index). Hint inject
   position bias that a fixed correct-slot would introduce).
 - **MMLU-Pro** (ungated) is the pipeline-smoke + generalization set; `answer_index` is 0-based.
 
-The pure parsers (`parse_*_record`) are unit-tested; the `load_*` helpers hit HF.
+The parsers (`parse_*_record`) are pure; the `load_*` helpers hit HF.
 """
 
 from __future__ import annotations
