@@ -145,11 +145,9 @@ def extract_reasoning(output) -> str:
     (open weights via OpenRouter) emit their CoT here, SEPARATE from `.completion`; `''` if none.
     Text-less signature artifacts from a disabled channel are dropped (see _real_reasoning_text).
 
-    NEEDS ON-POD VERIFICATION (self-host vLLM qwen3.5): the live endpoint returns the CoT in the
-    OpenAI `reasoning` message field (not `reasoning_content`). Whether inspect's `openai-api`
-    provider surfaces that `reasoning` field as a ContentReasoning block (so this reader picks it up
-    unchanged) has NOT been confirmed against the endpoint. If it does not, the vLLM `reasoning`
-    field must be mapped into a ContentReasoning block before this function is reached."""
+    Self-host vLLM note: the endpoint returns the CoT in the OpenAI `reasoning` message field
+    (not `reasoning_content`); if a provider does not surface that field as a ContentReasoning
+    block, map it into one before this function is reached."""
     msg = getattr(output, "message", None)
     content = getattr(msg, "content", None) if msg is not None else None
     if isinstance(content, list):
@@ -417,7 +415,7 @@ def rollout_row(rec: GridRecord, item: MCQItem) -> dict:
     every sweep runner so the audit table is identical everywhere."""
     return dict(
         item_id=rec.item_id,
-        topic=item.metadata.get("subdomain") or item.metadata.get("category"),
+        topic=item.metadata.get("subdomain"),
         hint_type=rec.hint_kind,
         cot_mode="with_cot" if rec.with_cot else "no_cot",
         sample_idx=rec.sample_idx,

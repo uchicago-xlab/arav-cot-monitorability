@@ -115,19 +115,3 @@ actors:
     tier: generalization_only
     necessity: na
     experiments: [hints]
-monitors:
-  gemini_3_5_flash_monitor:
-    id: openrouter/google/gemini-3.5-flash
-    provider: google-vertex
-    tier: monitor
-    role: [detection, summarizer]
-  opus_4_8_monitor:
-    id: openrouter/anthropic/claude-opus-4.8
-    provider: anthropic
-    tier: monitor
-    role: [detection]
-  gemini_2_5_flash_lite:
-    id: openrouter/google/gemini-2.5-flash-lite
-    provider: google-vertex
-    tier: monitor
-    role: [detection]

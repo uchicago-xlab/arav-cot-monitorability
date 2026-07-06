@@ -68,7 +68,7 @@ async def run_actor(name, args):
     gc = GenerateConfig(temperature=args.temperature, max_tokens=max_tokens)
     if args.attempt_timeout:           # cap per-attempt latency so a hung request fails+retries
         gc = gc.model_copy(update={"attempt_timeout": args.attempt_timeout})   # instead of wedging the pool (the novita/qwen3.5 stall)
-    # --cache-prompt (technique #3): Anthropic prompt caching for direct-Claude actors (opus_4_8_direct).
+    # --cache-prompt: Anthropic prompt caching for direct-Claude actors (opus_4_8_direct).
     # cache_ttl is a provider model_arg; the 10 identical samples in a (cell,arm) reuse the cached
     # prefix (metadata+question) at 0.1x. Only valid on the direct API (not bedrock/vertex).
     margs = {"cache_ttl": "5m"} if (args.cache_prompt and roster.get_entry(name).id.startswith("anthropic/")) else {}
@@ -128,7 +128,7 @@ async def run_actor(name, args):
             Path(f"logs/sweep_{name}{tg}.json").write_text(json.dumps({"summary": summ, "meta": meta}, indent=2, default=str))
         return summ, meta
 
-    if args.share_baseline:   # technique #2: none/simple + filter paid ONCE, complex per family
+    if args.share_baseline:   # none/simple + filter paid ONCE, complex per family
         records_all = []
         for i, it in enumerate(kept):
             records_all += await solver.run_sweep_multi(model, it, n_samples=args.n_samples,
@@ -201,7 +201,7 @@ def _cost_projection(metas, args):
               f"-> ~${usd:6.2f}  ~{hours:4.1f}h")
     print(f"  {'TOTAL':16} ~${grand_usd:6.2f}   wall ~{grand_hr:.1f}h sequential-per-actor "
           f"(less if actors run concurrently)")
-    print("  NB: qwen3-30b (Alibaba) is the slow leg; gpt-5.5 typically the $ leg. Prices live from OpenRouter.")
+    print("  NB: gpt-oss/deepseek are the slow legs; gpt-5.5 typically the $ leg. Prices live from OpenRouter.")
 
 
 async def main(args):
@@ -245,7 +245,7 @@ if __name__ == "__main__":
                     help="filter + none/simple paid ONCE per actor; complex run per "
                          "--families. ~1/3 fewer generations + item-matched families.")
     ap.add_argument("--cache-prompt", action="store_true",
-                    help="technique #3: Anthropic prompt caching (direct-Claude actors only, e.g. "
+                    help="Anthropic prompt caching (direct-Claude actors only, e.g. "
                          "opus_4_8_direct) — caches the metadata+question prefix across a cell's samples.")
     ap.add_argument("--candidates", type=int, default=120, help="items loaded before the correct-with-CoT filter")
     ap.add_argument("--filter-samples", type=int, default=4)

@@ -6,7 +6,7 @@ one-shot capability. This engine measures, per item, the gap between the **forbi
 selects the items that are genuinely CoT-necessary for THAT model.
 
 Used as a PRECONDITION for the hint experiment (not an afterthought):
-  * question necessity   — keep only GPQA/MMLU-Pro items the actor needs CoT to solve, so that
+  * question necessity   — keep only GPQA items the actor needs CoT to solve, so that
                            following a wrong hint is a meaningful behaviour change (else a low
                            unfaithfulness delta is ambiguous).
   * hint-decode necessity — verify the COMPLEX hint's arithmetic (e.g. K+Q mod 4) is itself

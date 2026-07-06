@@ -41,7 +41,6 @@ DISABLED = "disabled"
 
 # ── tiers ──
 FAITHFUL_HINTS = "faithful_hints"
-MONITOR = "monitor"
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = Path(os.environ.get("COT_MON_MODELS_CONFIG", _REPO_ROOT / "configs" / "models.yaml"))
@@ -70,7 +69,6 @@ class RosterEntry:
     """One model's resolved roster spec (pure data; no network)."""
 
     name: str
-    kind: str  # "actor" | "monitor"
     id: str  # openrouter/<provider>/<model>
     provider: str | None  # pinned endpoint tag
     cot_access: str | None
@@ -78,7 +76,6 @@ class RosterEntry:
     tier: str | None
     necessity: str | None
     experiments: tuple[str, ...] = ()
-    roles: tuple[str, ...] = ()
     no_cot_mechanism: str = "prefill"  # "prefill" | "structured_output" | "vllm_structured"
     #   (prefill-rejecting actors: Opus 4.8 -> structured_output; self-host vLLM qwen3.5 ->
     #   vllm_structured = single-letter schema + chat_template_kwargs enable_thinking:false)
@@ -96,12 +93,11 @@ class RosterEntry:
         return {"only": [self.provider], "allow_fallbacks": False}
 
 
-def _coerce(name: str, kind: str, spec: dict[str, Any]) -> RosterEntry:
+def _coerce(name: str, spec: dict[str, Any]) -> RosterEntry:
     if "id" not in spec:
         raise ValueError(f"roster entry {name!r} is missing required field 'id'")
     return RosterEntry(
         name=name,
-        kind=kind,
         id=spec["id"],
         provider=spec.get("provider"),
         cot_access=spec.get("cot_access"),
@@ -109,7 +105,6 @@ def _coerce(name: str, kind: str, spec: dict[str, Any]) -> RosterEntry:
         tier=spec.get("tier"),
         necessity=spec.get("necessity"),
         experiments=tuple(spec.get("experiments", ()) or ()),
-        roles=tuple(spec.get("role", ()) or ()),
         no_cot_mechanism=spec.get("no_cot_mechanism", "prefill"),
         reasoning_effort=spec.get("reasoning_effort"),
         notes=spec.get("notes"),
@@ -125,12 +120,8 @@ def load_roster(path: Path | str = DEFAULT_CONFIG, *, refresh: bool = False) -> 
     key = str(Path(path))
     if refresh or key not in _CACHE:
         cfg = yaml.safe_load(Path(path).read_text()) or {}
-        entries: dict[str, RosterEntry] = {}
-        for kind in ("actors", "monitors"):
-            for name, spec in (cfg.get(kind) or {}).items():
-                singular = "actor" if kind == "actors" else "monitor"
-                entries[name] = _coerce(name, singular, spec or {})
-        _CACHE[key] = entries
+        _CACHE[key] = {name: _coerce(name, spec or {})
+                       for name, spec in (cfg.get("actors") or {}).items()}
     return _CACHE[key]
 
 
@@ -143,8 +134,7 @@ def get_entry(name: str, *, path: Path | str = DEFAULT_CONFIG) -> RosterEntry:
 
 def actors_for(experiment: str, *, path: Path | str = DEFAULT_CONFIG) -> list[RosterEntry]:
     """Actors whose config lists `experiment` (e.g. 'hints')."""
-    return [e for e in load_roster(path).values()
-            if e.kind == "actor" and experiment in e.experiments]
+    return [e for e in load_roster(path).values() if experiment in e.experiments]
 
 
 def build_model(

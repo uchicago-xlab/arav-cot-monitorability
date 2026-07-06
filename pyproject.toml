@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "inspect-ai>=0.3",
     "openai>=2.40.0",          # required by inspect_ai's OpenRouter (OpenAI-compatible) provider
+    "httpx>=0.27",
     "anthropic>=0.40",         # required by inspect_ai's native anthropic provider (opus_4_8_direct)
     "datasets>=2.0",           # GPQA + MMLU-Pro loaders
     "pyyaml>=6.0",

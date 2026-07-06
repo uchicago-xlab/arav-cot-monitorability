@@ -1,15 +1,14 @@
-"""GPQA (replication anchor) + MMLU-Pro (generalization) loaders.
+"""GPQA loader.
 
-Normalises both into `MCQItem` (question + options + correct index). Hint injection and the
+Normalises records into `MCQItem` (question + options + correct index). Hint injection and the
 2x3 conditions live downstream (hints.py / solver); the loader just yields clean MCQs.
 
-- **GPQA** is the replication anchor (gated -> needs `HF_TOKEN`). Parsers read ONLY the question +
-  four answers (+ subdomain), so the GPQA canary string never enters a prompt.
-  Option order is shuffled DETERMINISTICALLY from the question hash (reproducible; kills the
-  position bias that a fixed correct-slot would introduce).
-- **MMLU-Pro** (ungated) is the pipeline-smoke + generalization set; `answer_index` is 0-based.
+GPQA is gated -> needs `HF_TOKEN`. The parser reads ONLY the question + four answers
+(+ subdomain), so the GPQA canary string never enters a prompt. Option order is shuffled
+DETERMINISTICALLY from the question hash (reproducible; kills the position bias that a fixed
+correct-slot would introduce).
 
-The parsers (`parse_*_record`) are pure; the `load_*` helpers hit HF.
+The parser (`parse_gpqa_record`) is pure; `load_gpqa` hits HF.
 """
 
 from __future__ import annotations
@@ -53,17 +52,6 @@ def _seed_from(text: str) -> int:
     return int(hashlib.sha1(text.encode("utf-8")).hexdigest()[:8], 16)
 
 
-def parse_mmlu_pro_record(rec: dict) -> MCQItem:
-    return MCQItem(
-        id=f"mmlu_pro:{rec.get('question_id')}",
-        question=str(rec["question"]).strip(),
-        options=tuple(rec["options"]),               # variable length; answer_index indexes this list
-        correct_index=int(rec["answer_index"]),
-        source="mmlu_pro",
-        metadata={"category": rec.get("category")},
-    )
-
-
 def parse_gpqa_record(rec: dict) -> MCQItem:
     correct = str(rec["Correct Answer"]).strip()
     incorrect = [str(rec[f"Incorrect Answer {k}"]).strip() for k in (1, 2, 3)]
@@ -79,16 +67,6 @@ def parse_gpqa_record(rec: dict) -> MCQItem:
         source="gpqa",
         metadata={"subdomain": rec.get("Subdomain")},
     )
-
-
-def load_mmlu_pro(*, n: int | None = None, categories=None, split: str = "test") -> list[MCQItem]:
-    import datasets
-
-    ds = datasets.load_dataset("TIGER-Lab/MMLU-Pro", split=split)
-    items = [parse_mmlu_pro_record(r) for r in ds]
-    if categories:
-        items = [it for it in items if it.metadata.get("category") in set(categories)]
-    return items[:n] if n else items
 
 
 def load_gpqa(*, config: str = "gpqa_extended", n: int | None = None, split: str = "train") -> list[MCQItem]:

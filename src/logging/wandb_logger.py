@@ -74,7 +74,7 @@ def run_config(*, describe: dict, n_items: int | None = None, n_samples: int | N
         "provider": describe.get("provider"), "cot_access": describe.get("cot_access"),
         "cot_source": describe.get("cot_source"),
         "reasoning_enabled": describe.get("reasoning_enabled"), "tier": describe.get("tier"),
-        "necessity": describe.get("necessity"), "uplift_set": describe.get("uplift_set"),
+        "necessity": describe.get("necessity"),
         "n_items": n_items, "n_samples": n_samples, "seed": seed,
         "dataset": dataset, "dataset_hash": dataset_hash, "hint_family": hint_family,
     }
