@@ -104,6 +104,15 @@ Per-model — **live · reasoning · prefill** (provider in parens):
   - `gemini_3_1_pro` (google-vertex) — summary trace → **generalization-only headline** (caveated, judged body only), not a faithful actor.
 
 ## Drift log (deviations from SPEC/CLAUDE — read first)
+- **Figure-roster consistency audit + fixes (2026-07-06).** Cross-checked every figure actor list against
+  available data. Fixes: (1) removed dead `qwen3_30b` from `make_figures.ORDER` (no transcript/decode/family
+  data); (2) added `opus_4_8_direct` to `make_clean_figures.DECODE_ORDER` — it has all-rollout decode data
+  and was in the raw figC1/C2 (ACTOR_ORDER) but missing from the CLEAN ones (now in the all-rollout clean
+  figC1/C2; still absent from answered-only + scatter, which need per-rollout emit that opus's batch-API
+  decode lacks); (3) built `logs/sweep_gemini_3_5_flash.json` from its arithmetic transcript → gemini-3.5-flash
+  now in fig3/fig4 (full L1/L2/L3). Left opus OUT of fig3/fig4 (headline-only run = arithmetic complex_L1
+  only; a lone-L1 bar would misread). Post-fix audit: every list-membership is data-backed and every
+  data-backed actor is in its graphs (deepseek intentionally excluded; gpt_oss_120b OR superseded by selfhost).
 - **qwen3-32b added to fig0/1/3/4/5 (2026-07-06).** It was already in the decode/family graphs; pulled its
   **arithmetic §3.1 sweep** transcript from W&B (`fw7ruiky`, actor `qwen3_32b_selfhost`) → built the
   fig0/1/5 transcript + fig3/4 summary (gitignored), and added `qwen3_32b` to `make_figures`

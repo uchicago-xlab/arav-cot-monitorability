@@ -37,12 +37,12 @@ from cot_mon.metrics import load_withcot_rollouts  # noqa: E402  (explicit-selec
 # OpenRouter run is dropped everywhere (per Arav). It carries the plain "gpt-oss-120b" label so the
 # figures keep the earlier composition (one gpt-oss row, no OR/vLLM tags).
 ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "gpt_oss_120b_selfhost",
-         "qwen3_30b", "qwen3_5_122b", "qwen3_32b", "olmo3_32b", "nemotron3_120b",
+         "qwen3_5_122b", "qwen3_32b", "olmo3_32b", "nemotron3_120b",
          "opus_4_8_direct", "gemini_3_1_pro"]
 LABEL = {"gemini_2_5_flash": "gemini-2.5-flash\n(paper)", "gemini_3_flash": "gemini-3-flash",
          "gemini_3_5_flash": "gemini-3.5-flash", "gpt_5_5": "gpt-5.5",
          "gpt_oss_120b_selfhost": "gpt-oss-120b",
-         "qwen3_30b": "qwen3-30b", "qwen3_5_122b": "qwen3.5-122b", "qwen3_32b": "qwen3-32b",
+         "qwen3_5_122b": "qwen3.5-122b", "qwen3_32b": "qwen3-32b",
          "olmo3_32b": "olmo3-32b", "nemotron3_120b": "nemotron3-120b",
          "opus_4_8_direct": "opus-4.8\n(struct no-CoT†)", "gemini_3_1_pro": "gemini-3.1-pro\n(gen-only‡)"}
 LEVELS = ["complex_L1", "complex_L2", "complex_L3"]
