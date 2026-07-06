@@ -104,6 +104,12 @@ Per-model — **live · reasoning · prefill** (provider in parens):
   - `gemini_3_1_pro` (google-vertex) — summary trace → **generalization-only headline** (caveated, judged body only), not a faithful actor.
 
 ## Drift log (deviations from SPEC/CLAUDE — read first)
+- **deepseek-v4-flash DROPPED from all graphs (2026-07-06, Arav).** Removed `deepseek_v4_flash` from every
+  figure actor list (`make_figures` ORDER/JUDGEABLE/LABEL/COLOR, `make_clean_figures.DECODE_ORDER`,
+  `make_complex_figures.ACTOR_ORDER/LABEL`, `make_family_figures._ALL/LABEL`, `assemble.ACTORS`) and
+  regenerated. deepseek no longer appears in any clean/3p1_family_sweep/3p1_complex_hints/3p1_replication
+  figure. Its underlying result data (`family_*` entries, `decode_necessity_deepseek_v4_flash.json`,
+  transcripts) is LEFT INTACT — this is a plot-only removal, reversible by re-adding it to the lists.
 - **NVIDIA-Nemotron-3-Super-120B-A12B (FP8) added as an 11th actor, ALL graphs (2026-07-05, Session #12).**
   Same full pull as OLMo: copied the branch's `decode_necessity_nemotron3_120b.json` (emit ✓) + merged
   its `nemotron3_120b` family entries (kept gpt-oss-selfhost); pulled its **arithmetic §3.1 sweep**
