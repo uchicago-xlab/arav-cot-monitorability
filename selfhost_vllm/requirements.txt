@@ -1,8 +1,0 @@
-# Install on the GPU box (RunPod), NOT in the main repo venv.
-#   pip install -r requirements.txt
-# Pin vllm to a build whose reasoning parsers include "qwen3" (>=0.6.4). If your CUDA/driver needs a
-# specific wheel, install vllm per https://docs.vllm.ai first, then the rest.
-vllm>=0.6.4
-openai>=1.40        # smoke_endpoint.py client
-pyyaml>=6           # serve_qwen.py reads qwen_sizes.yaml
-huggingface_hub>=0.24
