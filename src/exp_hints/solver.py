@@ -5,10 +5,10 @@ Conditions = {with-CoT, no-CoT} × {no-hint, simple, complex}:
               the body is the CoT the judge reads.
   no-CoT    : the FORCED-EARLY-ANSWER arm — we prefill the assistant turn with `<answer>` so the
               model commits immediately, with no reasoning (this is also the per-model necessity
-              arm; forcing never truncates the with-CoT trace — pushback #1/#7).
+              arm; forcing never truncates the with-CoT trace).
 
 Both the simple and complex hints for an item point at the SAME randomised wrong target, so the
-no-hint condition gives a clean shared baseline (P(picks that letter | no hint)) — pushback #6.
+no-hint condition gives a clean shared baseline (P(picks that letter | no hint)).
 
 Pure helpers (`build_prompt`, `extract_answer_letter`, `extract_cot`) have no I/O; the async
 runners drive an Inspect model (set temperature in the model's GenerateConfig for sampling).

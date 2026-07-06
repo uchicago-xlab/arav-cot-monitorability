@@ -9,7 +9,7 @@ audit it after the fact:
      `<name>_lo` / `<name>_hi` keys (see `metrics.flatten_for_logging`).
   3. **CoT-verification table + transcripts.jsonl** — one row per rollout (full prompt + full CoT
      + judge verdict/rationale). The table is for browsing in the UI; the JSONL artifact is the
-     archival source of truth. THIS is what lets the human open W&B and re-check the judge calls.
+     archival source of truth. THIS is what lets a reviewer open W&B and re-check the judge calls.
 
 Modes: pass `mode="disabled"` (fully no-op, no files, no network) or `mode="offline"`
 (writes ./wandb locally, no network) — or set `WANDB_MODE`. No secret ever enters the config: we

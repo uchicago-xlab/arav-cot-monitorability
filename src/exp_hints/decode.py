@@ -91,7 +91,7 @@ def make_sampler(model, *, capture: list | None = None, stats: dict | None = Non
     zero analysis tokens; the ONLY true no-CoT arm for gpt-oss).
     Mirrors `solver.run_condition`: the answer is taken from the body first, then the reasoning trace.
 
-    `stats` also accumulates per-arm EMISSION evidence (Gate-0 / truncation audit): gen_{cot,nocot}
+    `stats` also accumulates per-arm EMISSION evidence (truncation audit): gen_{cot,nocot}
     (generations), emit_{cot,nocot} (produced an extractable letter), and leak_nocot (harmony no-CoT
     rollouts where an analysis channel leaked — should stay 0).
     """

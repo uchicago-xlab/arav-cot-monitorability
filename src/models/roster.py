@@ -5,7 +5,7 @@ status, loaded from `configs/models.yaml` (never hardcode IDs).
 Encapsulates how each model exposes / disables its reasoning so experiments can request
 "the actor's reasoning trace" and get it regardless of provider quirks.
 
-`build_model(name)` returns an Inspect `Model` with two things wired from Phase-0:
+`build_model(name)` returns an Inspect `Model` with two things wired from the provider probes:
   * provider pin  -> model arg `provider={"only":[tag], "allow_fallbacks": False}`
                      (exact endpoint/quant, or fail loudly — reproducibility).
   * CoT-access    -> model arg `reasoning_enabled` (e.g. False = the GPT-5.5 / Gemini-flash

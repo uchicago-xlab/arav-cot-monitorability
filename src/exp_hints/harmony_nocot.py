@@ -97,7 +97,7 @@ async def force_final_letter(model, prompt: str, *, n_options: int = 4, temperat
 
     Returns {letter, raw, in_tok, out_tok, analysis_leak}. `letter` is the extracted option letter
     (None if the model abstained / rambled — e.g. `<answer></answer>`); `analysis_leak` is True iff
-    an analysis channel somehow appeared (should ALWAYS be False — the Gate-0 invariant)."""
+    an analysis channel somehow appeared (should ALWAYS be False — the zero-analysis invariant)."""
     base, key = endpoint(model)
     client = _client(base, key)
     ids = _final_prefill_ids(prompt)
