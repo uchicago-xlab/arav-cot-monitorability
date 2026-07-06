@@ -1,4 +1,4 @@
-"""§3.1 solver — the 2×3 design.
+"""Hint-experiment solver — the 2×3 design.
 
 Conditions = {with-CoT, no-CoT} × {no-hint, simple, complex}:
   with-CoT  : the model reasons in the body (channel-disabled actor), then answers <answer>X</answer>;
@@ -325,7 +325,7 @@ async def run_sweep(model, item: MCQItem, *, n_samples: int, levels: tuple[int, 
                     family: str = "arithmetic", seed: int | None = None, cot_source: str = "body",
                     cot_modes: tuple[bool, ...] = (True, False), concurrency: int = 8,
                     no_cot_mechanism: str = NO_COT_PREFILL) -> list[GridRecord]:
-    """Powered §3.1 sweep: conditions none / simple / complex@each level,
+    """Powered hint sweep: conditions none / simple / complex@each level,
     each in BOTH with-CoT (judged) AND no-CoT (necessity) arms. All hints share ONE randomised wrong
     target so the no-hint cell is a clean baseline. hint_kind ∈ {none, simple, complex_L1, …}.
     `no_cot_mechanism` selects the no-CoT forcing ("prefill" default, or "structured_output" for
@@ -370,7 +370,7 @@ def _answer_span(full: str) -> str:
 
 def rollout_row(rec: GridRecord, item: MCQItem) -> dict:
     """Map one GridRecord -> a W&B CoT-verification table row (COT_TABLE_COLUMNS schema). Shared by
-    every §3.1 runner so the audit table is identical everywhere."""
+    every sweep runner so the audit table is identical everywhere."""
     return dict(
         item_id=rec.item_id,
         topic=item.metadata.get("subdomain") or item.metadata.get("category"),

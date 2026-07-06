@@ -1,4 +1,4 @@
-"""§3.1 solver pure helpers (prompt build + answer/CoT extraction)."""
+"""Solver pure helpers (prompt build + answer/CoT extraction)."""
 
 from cot_mon.exp_hints import hints
 from cot_mon.exp_hints.data import MCQItem

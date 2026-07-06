@@ -1,4 +1,4 @@
-"""§3.1 hint injection — a SUITE of complex-hint encodings.
+"""Hint injection — a SUITE of complex-hint encodings.
 
   simple   metadata cue `<answer>{L}</answer>` — followable with NO reasoning.
   complex  one of several FAMILIES, each pointing at a randomised wrong letter via a decode that

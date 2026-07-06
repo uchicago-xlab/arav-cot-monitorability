@@ -1,7 +1,7 @@
 """Model roster.
 
 Logical name -> OpenRouter model + provider pin + CoT-access mode + per-model necessity
-status + uplift-set id, loaded from `configs/models.yaml` (never hardcode IDs).
+status, loaded from `configs/models.yaml` (never hardcode IDs).
 Encapsulates how each model exposes / disables its reasoning so experiments can request
 "the actor's reasoning trace" and get it regardless of provider quirks.
 
@@ -40,7 +40,7 @@ BODY_CHANNEL = "body_channel"
 DISABLED = "disabled"
 
 # ── tiers ──
-FAITHFUL_HINTS_GRADIENT = "faithful_hints_gradient"
+FAITHFUL_HINTS = "faithful_hints"
 MONITOR = "monitor"
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -77,7 +77,6 @@ class RosterEntry:
     reasoning_enabled: bool | None
     tier: str | None
     necessity: str | None
-    uplift_set: str | None
     experiments: tuple[str, ...] = ()
     roles: tuple[str, ...] = ()
     no_cot_mechanism: str = "prefill"  # "prefill" | "structured_output" | "vllm_structured"
@@ -109,7 +108,6 @@ def _coerce(name: str, kind: str, spec: dict[str, Any]) -> RosterEntry:
         reasoning_enabled=spec.get("reasoning_enabled"),
         tier=spec.get("tier"),
         necessity=spec.get("necessity"),
-        uplift_set=spec.get("uplift_set"),
         experiments=tuple(spec.get("experiments", ()) or ()),
         roles=tuple(spec.get("role", ()) or ()),
         no_cot_mechanism=spec.get("no_cot_mechanism", "prefill"),
@@ -144,7 +142,7 @@ def get_entry(name: str, *, path: Path | str = DEFAULT_CONFIG) -> RosterEntry:
 
 
 def actors_for(experiment: str, *, path: Path | str = DEFAULT_CONFIG) -> list[RosterEntry]:
-    """Actors whose config lists `experiment` (e.g. 'hints', 'gradient', 'oversight')."""
+    """Actors whose config lists `experiment` (e.g. 'hints')."""
     return [e for e in load_roster(path).values()
             if e.kind == "actor" and experiment in e.experiments]
 
@@ -208,7 +206,7 @@ def build_model(
 
 def judged_cot_source(cot_access: str | None) -> str:
     """Which part of a `generate()` output holds this actor's REAL reasoning trace — the field the
-    §3.1 judge must read (channel-aware capture):
+    hint judge must read (channel-aware capture):
 
       native_raw            -> "reasoning"  open weights: raw CoT in the `reasoning` field
                                             (Inspect surfaces it as a ContentReasoning block,
@@ -232,6 +230,6 @@ def describe(name: str, *, path: Path | str = DEFAULT_CONFIG) -> dict[str, Any]:
         "name": e.name, "id": e.id, "provider": e.provider,
         "cot_access": e.cot_access, "cot_source": judged_cot_source(e.cot_access),
         "reasoning_enabled": e.reasoning_enabled,
-        "tier": e.tier, "necessity": e.necessity, "uplift_set": e.uplift_set,
+        "tier": e.tier, "necessity": e.necessity,
         "no_cot_mechanism": e.no_cot_mechanism,
     }

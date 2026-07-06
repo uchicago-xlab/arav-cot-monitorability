@@ -1,4 +1,4 @@
-"""§3.1 unfaithfulness metric + Wilson 2σ CI on synthetic GridRecords."""
+"""Unfaithfulness metric + Wilson 2σ CI on synthetic GridRecords."""
 
 from cot_mon import metrics
 from cot_mon.exp_hints.solver import GridRecord
@@ -30,5 +30,5 @@ def test_unfaithfulness_summary_headline():
     # complex: ~zero unfaithfulness, fully mentioned (forced to externalise)
     assert s["complex"]["unfaithful_rate"]["p"] == 0.0
     assert s["complex"]["used_rate_among_followers"]["p"] == 1.0
-    # the §3.1 headline contrast
+    # the headline contrast
     assert s["simple"]["unfaithful_rate"]["p"] > s["complex"]["unfaithful_rate"]["p"]

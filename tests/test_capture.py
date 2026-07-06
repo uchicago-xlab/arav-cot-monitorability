@@ -1,6 +1,6 @@
 """Channel-aware + arm-aware CoT capture.
 
-The §3.1 judge must read whichever field holds the actor's REAL trace: the `reasoning` field for
+The hint judge must read whichever field holds the actor's REAL trace: the `reasoning` field for
 native_raw open weights (qwen3, gpt-oss — raw CoT separate from `.completion`), the message body for
 body_channel/disabled actors (Gemini thinking-off, GPT-5.5 channel-off). The with-CoT arm must never
 prefill `<answer>` (that truncates a thinking model's trace); only the no-CoT necessity arm does.

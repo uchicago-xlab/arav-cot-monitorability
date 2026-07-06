@@ -1,4 +1,4 @@
-"""§3.1 data — GPQA (replication anchor) + MMLU-Pro (generalization) loaders.
+"""GPQA (replication anchor) + MMLU-Pro (generalization) loaders.
 
 Normalises both into `MCQItem` (question + options + correct index). Hint injection and the
 2x3 conditions live downstream (hints.py / solver); the loader just yields clean MCQs.

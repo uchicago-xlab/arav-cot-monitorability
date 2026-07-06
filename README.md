@@ -10,11 +10,10 @@ Language Models Struggle to Evade Monitors"* (arXiv 2507.05246), built on
 configs/models.yaml       roster: logical name -> OpenRouter id + provider pin + CoT-access mode
 src/cot_mon/
   models/roster.py        model layer (provider pins, reasoning enable/disable, no-CoT mechanisms)
-  monitors/hint_judge.py  §3.1 hint-mention judge
+  monitors/hint_judge.py  hint-mention judge
   monitors/uplift_filter.py  per-model CoT-necessity (uplift) measurement + item filter
   metrics.py              unfaithfulness / decode-necessity metrics (Wilson + Newcombe CIs)
-  exp_hints/              §3.1 difficult hints (data, hint suite, solver, decode-necessity)
-  exp_gradient/           §3.2 difficulty gradient (SymPy algebra generator)
+  exp_hints/              difficult-hints experiment (data, hint suite, solver, decode-necessity)
   logging/                Weights & Biases run/rollout logging
 results/                  aggregate metrics behind the figures (JSON)
 figures/                  rendered figures

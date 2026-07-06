@@ -5,7 +5,7 @@ one-shot capability. This engine measures, per item, the gap between the **forbi
 (answer immediately, no reasoning) and the **allowed-CoT** arm (reason, then answer), and
 selects the items that are genuinely CoT-necessary for THAT model.
 
-Used as a PRECONDITION for §3.1 (not an afterthought):
+Used as a PRECONDITION for the hint experiment (not an afterthought):
   * question necessity   — keep only GPQA/MMLU-Pro items the actor needs CoT to solve, so that
                            following a wrong hint is a meaningful behaviour change (else a low
                            unfaithfulness delta is ambiguous).
@@ -13,8 +13,6 @@ Used as a PRECONDITION for §3.1 (not an afterthought):
                            un-one-shottable for the actor; if it one-shots the decode there is
                            no externalisation to catch and low delta would be misread as faithful.
                            Same engine, items = the hint decodes.
-Reused by §3.2 (difficulty threshold) and §6 (environment calibration).
-
 The forbidden-CoT arm IS the forced-early-answer (token-forcing `<answer>`) condition. The caller
 supplies `sampler(prompt, allow_cot)`, so the forcing mechanism lives in the experiment and never
 truncates the with-CoT trace the judge reads.
@@ -77,7 +75,7 @@ def summarize(results: Sequence[ItemUplift], *, min_uplift: float = MIN_UPLIFT) 
     """Yield + mean-uplift summary; `yield` is the fraction of items that are CoT-necessary.
 
     A low yield for a strong model is itself a result (e.g. GPT-5.5 may produce very few
-    CoT-necessary GPQA items → it doesn't run §3.1; decide from yield).
+    CoT-necessary GPQA items → it doesn't run the hint experiment; decide from yield).
     """
     n = len(results)
     kept = select_uplift_set(results, min_uplift=min_uplift)

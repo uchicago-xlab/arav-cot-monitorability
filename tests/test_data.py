@@ -1,4 +1,4 @@
-"""§3.1 MCQ parsers (pure; no network)."""
+"""MCQ parsers (pure; no network)."""
 
 from cot_mon.exp_hints import data
 

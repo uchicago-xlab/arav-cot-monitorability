@@ -9,7 +9,6 @@ dependencies = [
     "openai>=2.40.0",          # required by inspect_ai's OpenRouter (OpenAI-compatible) provider
     "anthropic>=0.40",         # required by inspect_ai's native anthropic provider (opus_4_8_direct)
     "datasets>=2.0",           # GPQA + MMLU-Pro loaders
-    "sympy>=1.12",
     "pyyaml>=6.0",
     "wandb>=0.17",             # experiment tracking — every run logs config + scalars + CoT table
     "openai-harmony>=0.0.8",

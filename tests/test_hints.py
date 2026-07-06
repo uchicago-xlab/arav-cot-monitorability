@@ -1,4 +1,4 @@
-"""§3.1 hint transforms (pure)."""
+"""Hint transforms (pure)."""
 
 import random
 

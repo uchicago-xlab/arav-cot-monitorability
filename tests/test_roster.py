@@ -18,7 +18,7 @@ def test_primary_actor_fields():
     assert e.provider == "google-vertex"
     assert e.reasoning_enabled is False          # hidden channel OFF
     assert e.cot_access == roster.DISABLED
-    assert e.tier == roster.FAITHFUL_HINTS_GRADIENT
+    assert e.tier == roster.FAITHFUL_HINTS
     assert e.necessity == "confirmed"
     assert e.provider_pin == {"only": ["google-vertex"], "allow_fallbacks": False}
 
@@ -32,7 +32,7 @@ def test_gpt55_disable_lock():
 def test_actors_for_experiment():
     hints = {e.name for e in roster.actors_for("hints")}
     assert "gemini_3_flash" in hints
-    assert "opus_4_8" not in hints                # no prefill -> not in hints/gradient
+    assert "opus_4_8" not in hints                # no prefill -> not in hints
 
 
 def test_unknown_raises():
@@ -55,7 +55,7 @@ def test_selfhost_actor_fields():
     assert e.reasoning_enabled is None                 # OpenRouter-only arg; N/A on self-host path
     assert e.cot_access == roster.NATIVE_RAW
     assert e.no_cot_mechanism == "vllm_structured"     # prefill not honored -> schema + enable_thinking:false
-    assert e.experiments == ("hints",)                 # decode-necessity + §3.1 only
+    assert e.experiments == ("hints",)                 # decode-necessity + hints only
 
 
 def test_build_model_openai_api_branch(monkeypatch):
@@ -76,7 +76,7 @@ def test_build_model_openai_api_branch(monkeypatch):
 
 def test_gptoss_selfhost_actor_fields():
     """The gpt-oss self-host re-run actor (faithful replacement for the provider-suspect OpenRouter
-    gpt_oss_120b §3.1 numbers). no_cot arm = the harmony final-channel force (zero analysis tokens)."""
+    gpt_oss_120b hint-sweep numbers). no_cot arm = the harmony final-channel force (zero analysis tokens)."""
     e = roster.get_entry("gpt_oss_120b_selfhost")
     assert e.id == "openai-api/vllm/gpt-oss-120b"      # service `vllm`; model segment = --served-model-name
     assert e.provider is None and e.provider_pin is None

@@ -34,7 +34,7 @@ def test_cot_table_matches_spec_schema():
     run = _run()
     run.log_rollout(**_full_row(item_id="gpqa:abc", cot_text_full="step... <answer>C"))
     table = run.build_table()
-    assert tuple(table.columns) == wl.COT_TABLE_COLUMNS         # exact §1 schema + order
+    assert tuple(table.columns) == wl.COT_TABLE_COLUMNS         # exact schema + order
     assert len(table.data) == 1
     assert table.data[0][wl.COT_TABLE_COLUMNS.index("item_id")] == "gpqa:abc"
     assert table.data[0][wl.COT_TABLE_COLUMNS.index("engaged_hint")] is True  # bools preserved

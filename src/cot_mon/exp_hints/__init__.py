@@ -1,4 +1,4 @@
-"""§3.1 difficult hints.
+"""Difficult hints.
 
 GPQA multiple-choice; conditions: no hint / simple hint / complex hint.
   simple  = inject a wrong letter as metadata, e.g. <answer>C</answer>
