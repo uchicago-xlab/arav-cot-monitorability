@@ -1,4 +1,4 @@
-"""SPEC §8 — §3.1 hint transforms (pure)."""
+"""§3.1 hint transforms (pure)."""
 
 import random
 

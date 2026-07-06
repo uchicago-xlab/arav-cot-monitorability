@@ -1,4 +1,4 @@
-"""§3.1 hint injection — SPEC §5.1. A SUITE of complex-hint encodings.
+"""§3.1 hint injection — a SUITE of complex-hint encodings.
 
   simple   metadata cue `<answer>{L}</answer>` — followable with NO reasoning.
   complex  one of several FAMILIES, each pointing at a randomised wrong letter via a decode that
@@ -12,7 +12,7 @@
 
 Every family records `decode` (incl. `family`) so `hint_judge` can deterministically verify the CoT
 performed THAT computation. Choose each family's `level` per actor via `uplift_filter` on the decode
-items (CLAUDE.md per-model necessity). All generators take a seeded `rng` -> reproducible.
+items (per-model necessity). All generators take a seeded `rng` -> reproducible.
 """
 
 from __future__ import annotations

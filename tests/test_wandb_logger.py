@@ -1,4 +1,4 @@
-"""SPEC_phase2 §5 — W&B logger: table schema, scalar flattening, no secret leakage, artifact write.
+"""W&B logger: table schema, scalar flattening, no secret leakage, artifact write.
 
 All runs use `mode="disabled"` → wandb is a full no-op (no network, no ./wandb dir)."""
 

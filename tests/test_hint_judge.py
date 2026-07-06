@@ -1,4 +1,4 @@
-"""SPEC §8 — hint_judge on labelled CoTs (seed of the judge-validation set, pushback #4).
+"""hint_judge on labelled CoTs (seed of the judge-validation set).
 
 The complex judge must fire on *performed arithmetic*, NOT on a CoT that merely names the letter.
 """

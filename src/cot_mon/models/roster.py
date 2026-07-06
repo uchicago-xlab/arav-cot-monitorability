@@ -1,18 +1,18 @@
-"""Model roster — SPEC §4.0.
+"""Model roster.
 
 Logical name -> OpenRouter model + provider pin + CoT-access mode + per-model necessity
-status + uplift-set id, loaded from `configs/models.yaml` (never hardcode IDs — CLAUDE.md).
+status + uplift-set id, loaded from `configs/models.yaml` (never hardcode IDs).
 Encapsulates how each model exposes / disables its reasoning so experiments can request
 "the actor's reasoning trace" and get it regardless of provider quirks.
 
 `build_model(name)` returns an Inspect `Model` with two things wired from Phase-0:
   * provider pin  -> model arg `provider={"only":[tag], "allow_fallbacks": False}`
-                     (exact endpoint/quant, or fail loudly — reproducibility, CLAUDE.md).
+                     (exact endpoint/quant, or fail loudly — reproducibility).
   * CoT-access    -> model arg `reasoning_enabled` (e.g. False = the GPT-5.5 / Gemini-flash
                      hidden-channel disable lock; the OpenRouter provider maps it to
                      extra_body.reasoning.enabled).
 
-CoT-access modes (CLAUDE.md CORE PRINCIPLE: faithful actor needs channel-disable AND the task
+CoT-access modes (CORE PRINCIPLE: faithful actor needs channel-disable AND the task
 CoT-necessary for *that* model — raw exposure ≠ necessity):
   native_raw    open weights, raw faithful trace via `reasoning`
   summary       closed models — reasoning field is a SUMMARY (not faithful)
@@ -39,11 +39,8 @@ SUMMARY = "summary"
 BODY_CHANNEL = "body_channel"
 DISABLED = "disabled"
 
-# ── tiers (SPEC §3) ──
+# ── tiers ──
 FAITHFUL_HINTS_GRADIENT = "faithful_hints_gradient"
-FAITHFUL_CONDITIONAL = "faithful_conditional"
-FAITHFUL_AGENTIC = "faithful_agentic"
-GENERALIZATION_ONLY = "generalization_only"
 MONITOR = "monitor"
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -152,10 +149,6 @@ def actors_for(experiment: str, *, path: Path | str = DEFAULT_CONFIG) -> list[Ro
             if e.kind == "actor" and experiment in e.experiments]
 
 
-def by_tier(tier: str, *, path: Path | str = DEFAULT_CONFIG) -> list[RosterEntry]:
-    return [e for e in load_roster(path).values() if e.tier == tier]
-
-
 def build_model(
     name: str,
     *,
@@ -215,7 +208,7 @@ def build_model(
 
 def judged_cot_source(cot_access: str | None) -> str:
     """Which part of a `generate()` output holds this actor's REAL reasoning trace — the field the
-    §3.1 judge must read (channel-aware capture; SPEC_phase2 §2.1):
+    §3.1 judge must read (channel-aware capture):
 
       native_raw            -> "reasoning"  open weights: raw CoT in the `reasoning` field
                                             (Inspect surfaces it as a ContentReasoning block,
@@ -232,13 +225,8 @@ def judged_cot_source(cot_access: str | None) -> str:
     return "none"
 
 
-def is_judgeable(name: str, *, path: Path | str = DEFAULT_CONFIG) -> bool:
-    """True iff this actor exposes a raw trace we can read for §3.1 (native_raw or body/disabled)."""
-    return judged_cot_source(get_entry(name, path=path).cot_access) != "none"
-
-
 def describe(name: str, *, path: Path | str = DEFAULT_CONFIG) -> dict[str, Any]:
-    """Per-run log record (CLAUDE.md: log provider + mode + necessity)."""
+    """Per-run log record: provider + CoT-access mode + necessity status."""
     e = get_entry(name, path=path)
     return {
         "name": e.name, "id": e.id, "provider": e.provider,

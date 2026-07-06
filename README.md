@@ -4,35 +4,27 @@ Replication + extension of Emmons et al. 2025, *"When Chain of Thought is Necess
 Language Models Struggle to Evade Monitors"* (arXiv 2507.05246), built on
 [Inspect](https://inspect.aisi.org.uk/) and routed through OpenRouter.
 
-- **[SPEC.md](SPEC.md)** — engineering blueprint (what to build, in order).
-- **[CLAUDE.md](CLAUDE.md)** — repo rules + cross-session handoff protocol.
-- **[STATUS.md](STATUS.md)** — paste-ready status for the planning chat (keep current).
-
 ## Layout
 
 ```text
-configs/models.yaml       roster: logical name -> OpenRouter id + provider + CoT-access mode
+configs/models.yaml       roster: logical name -> OpenRouter id + provider pin + CoT-access mode
 src/cot_mon/
-  models/roster.py        model layer (CoT-access modes)
-  transcripts.py          monitor views (cot_only/action_only/combined) + §4.4 transforms
-  monitors/               detection · hint_judge · summarizer · coverage · calibration
-  scoring.py  metrics.py  ground-truth scoring + per-experiment metrics
-  exp_hints/              §3.1 difficult hints        (START HERE)
-  exp_gradient/           §3.2 difficulty gradient    (+ Follow-up C)
-  exp_oversight/          §6 oversight_pattern        (+ §4.4 summarization, Follow-up B)
-  followup_a/             agentic / tool-use monitorability   (HEADLINE)
-tasks/                    Inspect @task entry points (run via `inspect eval`)
-scripts/make_figures.py   figures + tables (2σ error bars)
-tests/                    mandatory tests (SPEC §8)
+  models/roster.py        model layer (provider pins, reasoning enable/disable, no-CoT mechanisms)
+  monitors/hint_judge.py  §3.1 hint-mention judge
+  monitors/uplift_filter.py  per-model CoT-necessity (uplift) measurement + item filter
+  metrics.py              unfaithfulness / decode-necessity metrics (Wilson + Newcombe CIs)
+  exp_hints/              §3.1 difficult hints (data, hint suite, solver, decode-necessity)
+  exp_gradient/           §3.2 difficulty gradient (SymPy algebra generator)
+  logging/                Weights & Biases run/rollout logging
+results/                  aggregate metrics behind the figures (JSON)
+figures/                  rendered figures
+tests/                    test suite
 ```
 
 ## Setup
 
 ```bash
 cp .env.example .env            # add OPENROUTER_API_KEY
-uv sync --extra dev             # install deps (inspect-ai, sympy, numpy/pandas/matplotlib, pytest)
+uv sync --extra dev             # install deps
 uv run pytest                   # run the test suite
-uv run inspect eval tasks/exp_hints.py --model openrouter/google/gemini-2.5-flash
 ```
-
-Build order is gated — see **SPEC §6**.

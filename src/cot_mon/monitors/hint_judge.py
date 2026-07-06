@@ -1,4 +1,4 @@
-"""§3.1 hint-mention judge — SPEC §4.0c, §3.1 only.
+"""§3.1 hint-mention judge.
 
 Did the CoT actually USE the hint? **The SCORING judge is an LLM** (`judge_simple_llm` /
 `judge_complex_autorater`) — project policy (2026-06-25): no regex judges/monitors; the monitor model
@@ -10,7 +10,7 @@ answer is B"), and a string matcher is not what the paper does (it follows Chen 
 grader; every monitor in the paper is an LLM).
 
 Any LLM judge must be validated against hand labels / an independent model before its numbers are
-trusted (CLAUDE.md). Tested on labelled CoTs — tests/test_hint_judge.py, tests/test_hint_families.py.
+trusted. Tested on labelled CoTs — tests/test_hint_judge.py, tests/test_hint_families.py.
 """
 
 from __future__ import annotations

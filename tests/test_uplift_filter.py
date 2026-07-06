@@ -1,4 +1,4 @@
-"""SPEC §8/§9 — per-model uplift engine (pure aggregation + fake-sampler orchestration)."""
+"""Per-model uplift engine (pure aggregation + fake-sampler orchestration)."""
 
 import asyncio
 

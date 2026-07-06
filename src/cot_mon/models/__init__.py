@@ -1,1 +1,1 @@
-"""Model layer — SPEC §3.1. See roster.py."""
+"""Model layer — see roster.py."""

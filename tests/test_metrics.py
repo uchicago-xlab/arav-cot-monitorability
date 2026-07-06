@@ -1,4 +1,4 @@
-"""SPEC §8 — §3.1 unfaithfulness metric + Wilson 2σ CI on synthetic GridRecords."""
+"""§3.1 unfaithfulness metric + Wilson 2σ CI on synthetic GridRecords."""
 
 from cot_mon import metrics
 from cot_mon.exp_hints.solver import GridRecord

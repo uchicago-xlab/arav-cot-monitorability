@@ -1,5 +1,4 @@
-"""Decode-necessity harness — shared by `scripts/calibrate_complex.py` and
-`scripts/decode_necessity_sweep.py` (Part C). One implementation so both measure the same thing.
+"""Decode-necessity harness (source of `results/decode_necessity/`).
 
 Measures whether an actor's COMPLEX-hint DECODE is CoT-necessary: with-CoT decode accuracy HIGH
 (it can compute the hinted letter) while forced-no-CoT is LOW (it cannot one-shot it) → high uplift.

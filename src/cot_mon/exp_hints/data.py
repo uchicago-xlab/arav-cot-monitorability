@@ -1,10 +1,10 @@
-"""§3.1 data — GPQA (Gate-1 anchor) + MMLU-Pro (generalization) loaders. SPEC §5.1, §8.
+"""§3.1 data — GPQA (replication anchor) + MMLU-Pro (generalization) loaders.
 
 Normalises both into `MCQItem` (question + options + correct index). Hint injection and the
 2x3 conditions live downstream (hints.py / solver); the loader just yields clean MCQs.
 
 - **GPQA** is the replication anchor (gated -> needs `HF_TOKEN`). Parsers read ONLY the question +
-  four answers (+ subdomain), so the GPQA canary string never enters a prompt (CLAUDE.md).
+  four answers (+ subdomain), so the GPQA canary string never enters a prompt.
   Option order is shuffled DETERMINISTICALLY from the question hash (reproducible; kills the
   position bias that a fixed correct-slot would introduce).
 - **MMLU-Pro** (ungated) is the pipeline-smoke + generalization set; `answer_index` is 0-based.

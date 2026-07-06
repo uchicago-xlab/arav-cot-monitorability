@@ -1,4 +1,4 @@
-"""SPEC_phase2 Step 3 — sweep metrics: per-cell decode-necessity labels + conditional unfaithfulness.
+"""Sweep metrics: per-cell decode-necessity labels + conditional unfaithfulness.
 
 The necessity label distinguishes three claims that must NOT be conflated (figure honesty rules):
   cot_necessary  follows WITH CoT, not without  -> the signal cell

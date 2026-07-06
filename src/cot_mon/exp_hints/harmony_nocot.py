@@ -13,8 +13,8 @@ channel, no `analysis` channel can precede it -> analysis/reasoning tokens == 0 
 (the completion is ~5 tokens: ` A</answer>`). This is the gpt-oss analogue of the prefill/structured
 no-CoT arms — but done at the harmony-channel level, which is exactly what the OpenRouter path could
 NOT do (its endpoints keep the analysis channel mandatory, so its "no-CoT" arm was still reasoning ->
-fake +0.00 / negative decode-uplift). Gate 0 (scripts/gate0_gptoss.py) verifies the zero-analysis
-property on real items before any decode number is trusted.
+fake +0.00 / negative decode-uplift). A gate check verified the zero-analysis
+property on real items before any decode number was trusted.
 
 Async so it parallelises inside the sweeps' concurrency pool — a synchronous client would block the
 event loop and serialise every no-CoT call. One AsyncOpenAI client per (base_url, api_key), with a

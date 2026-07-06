@@ -1,4 +1,4 @@
-"""W&B logger — the single path EVERY experiment logs through (SPEC_phase2 §1; CLAUDE.md).
+"""W&B logger — the single path EVERY experiment logs through.
 
 One `wandb` run per (experiment × actor × config). A run carries three things so a human can
 audit it after the fact:
@@ -32,7 +32,7 @@ import wandb
 DEFAULT_PROJECT = "cot-monitorability"
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
-# The CoT-verification table schema (SPEC_phase2 §1) — one row per rollout. Keep this list as the
+# The CoT-verification table schema — one row per rollout. Keep this list as the
 # single source of truth for column order; `log_rollout` rejects keys outside it.
 COT_TABLE_COLUMNS: tuple[str, ...] = (
     "item_id", "topic", "hint_type", "cot_mode", "sample_idx", "seed",

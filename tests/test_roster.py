@@ -1,4 +1,4 @@
-"""SPEC §8 — roster loader (pure; no network)."""
+"""Roster loader (pure; no network)."""
 
 import pytest
 

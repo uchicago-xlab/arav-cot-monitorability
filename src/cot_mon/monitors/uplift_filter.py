@@ -1,6 +1,6 @@
-"""Per-model necessity / CoT-uplift engine — SPEC §4.0c.
+"""Per-model necessity / CoT-uplift engine.
 
-CLAUDE.md CORE PRINCIPLE: a task is CoT-necessary for a model only if it exceeds that model's
+CORE PRINCIPLE: a task is CoT-necessary for a model only if it exceeds that model's
 one-shot capability. This engine measures, per item, the gap between the **forbidden-CoT** arm
 (answer immediately, no reasoning) and the **allowed-CoT** arm (reason, then answer), and
 selects the items that are genuinely CoT-necessary for THAT model.
@@ -20,7 +20,7 @@ supplies `sampler(prompt, allow_cot)`, so the forcing mechanism lives in the exp
 truncates the with-CoT trace the judge reads.
 
 Pure aggregation (`select_uplift_set`, `summarize`) + `measure` (with a fake sampler) are
-unit-tested — SPEC §9.
+unit-tested.
 """
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ def summarize(results: Sequence[ItemUplift], *, min_uplift: float = MIN_UPLIFT) 
     """Yield + mean-uplift summary; `yield` is the fraction of items that are CoT-necessary.
 
     A low yield for a strong model is itself a result (e.g. GPT-5.5 may produce very few
-    CoT-necessary GPQA items → it doesn't run §3.1; decide from yield — SPEC §5.1).
+    CoT-necessary GPQA items → it doesn't run §3.1; decide from yield).
     """
     n = len(results)
     kept = select_uplift_set(results, min_uplift=min_uplift)

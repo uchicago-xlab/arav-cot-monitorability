@@ -1,4 +1,4 @@
-"""SPEC_phase2 §2.1 — channel-aware + arm-aware CoT capture.
+"""Channel-aware + arm-aware CoT capture.
 
 The §3.1 judge must read whichever field holds the actor's REAL trace: the `reasoning` field for
 native_raw open weights (qwen3, gpt-oss — raw CoT separate from `.completion`), the message body for

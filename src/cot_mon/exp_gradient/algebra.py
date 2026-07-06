@@ -1,4 +1,4 @@
-"""SymPy algebra generator — SPEC §3.2 / §4.2 (the difficulty-gradient task).
+"""SymPy algebra generator — the §3.2 difficulty-gradient task.
 
 Paper-exact linear family:
 

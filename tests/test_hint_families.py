@@ -1,4 +1,4 @@
-"""SPEC §8 — complex-hint SUITE: every family decodes to its target, and its judge fires on
+"""Complex-hint SUITE: every family decodes to its target, and its judge fires on
 PERFORMED computation but not on a bare letter (pushback #4 across all encodings)."""
 
 import random
