@@ -297,6 +297,7 @@ dependencies = [
     { name = "inspect-ai" },
     { name = "openai" },
     { name = "openai-harmony" },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "wandb" },
 ]
@@ -314,6 +315,7 @@ requires-dist = [
     { name = "openai", specifier = ">=2.40.0" },
     { name = "openai-harmony", specifier = ">=0.0.8" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "python-dotenv", specifier = ">=1.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "wandb", specifier = ">=0.17" },
 ]

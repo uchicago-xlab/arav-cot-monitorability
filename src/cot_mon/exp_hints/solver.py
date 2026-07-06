@@ -364,6 +364,50 @@ async def run_sweep(model, item: MCQItem, *, n_samples: int, levels: tuple[int, 
     return records
 
 
+async def run_sweep_multi(model, item: MCQItem, *, n_samples: int, families: tuple[str, ...],
+                          levels: tuple[int, ...] = (1, 2, 3), seed: int | None = None,
+                          cot_source: str = "body", cot_modes: tuple[bool, ...] = (True, False),
+                          concurrency: int = 8, no_cot_mechanism: str = NO_COT_PREFILL) -> list[GridRecord]:
+    """COST-SAVING variant of run_sweep: runs none + simple ONCE and complex for
+    EVERY family in `families` (all sharing the SAME per-item random target), so the no-hint/simple
+    baseline isn't re-sampled per family. complex records are tagged hint_kind='complex_<family>_L<lv>';
+    `none`/`simple` are family-agnostic and reused across families by the caller. Statistically identical
+    to run_sweep per family (none/simple are family-independent), at ~1/3 fewer generations overall."""
+    eff_seed = seed if seed is not None else _seed_from(item.id)
+    rng = random.Random(eff_seed)
+    target = rng.choice([i for i in range(item.n_options) if i != item.correct_index])
+    conds: list[tuple[str, object]] = [
+        ("none", None),
+        ("simple", make_simple_hint(item.correct_index, item.n_options, rng=rng, target=target)),
+    ]
+    for fam in families:
+        for lv in levels:
+            conds.append((f"complex_{fam}_L{lv}",
+                          make_complex_hint(item.correct_index, item.n_options, rng=rng,
+                                            family=fam, level=lv, target=target)))
+    flat = [(kind, hint, wc) for (kind, hint) in conds for wc in cot_modes]
+    results = await _bounded_gather(
+        [run_condition(model, item, hint, with_cot=wc, cot_source=cot_source,
+                       no_cot_mechanism=no_cot_mechanism)
+         for (_, hint, wc) in flat for _ in range(n_samples)], concurrency)
+    records: list[GridRecord] = []
+    for ci, (kind, hint, wc) in enumerate(flat):
+        for si in range(n_samples):
+            r = results[ci * n_samples + si]
+            used = method = None
+            evidence: tuple[str, ...] = ()
+            if wc and hint is not None:
+                hu = (judge_simple(r["cot"], hint.target_letter) if kind == "simple"
+                      else judge_complex(r["cot"], hint.decode))
+                used, evidence, method = hu.used, hu.evidence, hu.method
+            records.append(GridRecord(
+                item.id, kind, wc, target, item.correct_index, r["picks_index"], r["cot"], used,
+                sample_idx=si, seed=eff_seed, prompt=r["prompt"], full_completion=r["full"],
+                target_letter=(hint.target_letter if hint is not None else ""),
+                judge_evidence=evidence, judge_method=method, cot_source=cot_source,
+                in_tok=r.get("in_tok", 0), out_tok=r.get("out_tok", 0)))
+    return records
+
 def _answer_span(full: str) -> str:
     return ("<answer>" + full.split("<answer>", 1)[1]) if "<answer>" in full else full[-300:]
 
@@ -390,3 +434,27 @@ def rollout_row(rec: GridRecord, item: MCQItem) -> dict:
         judge_method=rec.judge_method,
         judge_rationale=", ".join(rec.judge_evidence),
     )
+
+
+async def correct_with_cot(model, items, *, n_samples: int, threshold: float = 0.5, concurrency: int = 8,
+                           min_emission: float | None = None):
+    """Paper-style item filter for mandatory-reasoning actors (where a true no-CoT arm is
+    confounded): keep items the model answers correctly WITH CoT at >= `threshold`, so that
+    following a wrong hint is a clear, detectable switch. Returns (kept_items, {id: accuracy}).
+
+    `min_emission` (self-hosted gpt-oss at a tight ctx): ALSO require the with-CoT arm to EMIT an
+    extractable `<answer>` at >= this rate — i.e. drop items whose reasoning overruns the token
+    budget and truncates (no letter), and let the over-provisioned candidate pool backfill them.
+    This keeps the retained set's with-CoT emission >= ~95% without raising the context window."""
+    results = await _bounded_gather(
+        [run_condition(model, it, None, with_cot=True) for it in items for _ in range(n_samples)],
+        concurrency)
+    kept, rates = [], {}
+    for i, it in enumerate(items):
+        cell = [results[i * n_samples + j] for j in range(n_samples)]
+        hits = sum(r["picks_index"] == it.correct_index for r in cell)
+        rates[it.id] = hits / n_samples
+        emit_rate = sum(1 for r in cell if r["letter"]) / n_samples
+        if rates[it.id] >= threshold and (min_emission is None or emit_rate >= min_emission):
+            kept.append(it)
+    return kept, rates
