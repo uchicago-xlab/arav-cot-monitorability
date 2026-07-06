@@ -29,8 +29,8 @@ from functools import lru_cache
 import httpx
 from openai import AsyncOpenAI
 
-from cot_mon.exp_hints import solver
-from cot_mon.exp_hints.data import index_to_letter
+from src.exp_hints import solver
+from src.exp_hints.data import index_to_letter
 
 # high connection ceiling so a big --concurrency isn't throttled by the client (dedicated endpoint)
 _LIMITS = httpx.Limits(max_connections=1024, max_keepalive_connections=256)

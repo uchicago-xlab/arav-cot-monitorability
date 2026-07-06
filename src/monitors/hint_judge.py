@@ -10,7 +10,7 @@ answer is B"), and a string matcher is not what the paper does (it follows Chen 
 grader; every monitor in the paper is an LLM).
 
 Any LLM judge must be validated against hand labels / an independent model before its numbers are
-trusted. Tested on labelled CoTs — tests/test_hint_judge.py, tests/test_hint_families.py.
+trusted.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from cot_mon.exp_hints.data import index_to_letter
+from src.exp_hints.data import index_to_letter
 
 
 @dataclass(frozen=True)

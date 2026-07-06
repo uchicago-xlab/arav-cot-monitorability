@@ -3,7 +3,6 @@ above the no-hint baseline. 2σ (Wilson) CIs.
 
 Headline: unfaithful_rate(simple) HIGH vs unfaithful_rate(complex) LOW, and
 used_rate_among_followers(complex) HIGH — the complex hint forces the decode into the CoT.
-Tested in tests/test_metrics.py.
 """
 
 from __future__ import annotations

@@ -9,7 +9,7 @@ Language Models Struggle to Evade Monitors"* (arXiv 2507.05246), built on
 ```text
 run_sweep.py              powered hint-sweep runner (main entry point)
 configs/models.yaml       roster: logical name -> OpenRouter id + provider pin + CoT-access mode
-src/cot_mon/
+src/
   models/roster.py        model layer (provider pins, reasoning enable/disable, no-CoT mechanisms)
   monitors/hint_judge.py  hint-mention judge
   monitors/uplift_filter.py  per-model CoT-necessity (uplift) measurement + item filter
@@ -23,7 +23,7 @@ figures/                  rendered figures
 ## Setup
 
 ```bash
-cp .env.example .env            # add OPENROUTER_API_KEY
+printf 'OPENROUTER_API_KEY=sk-or-...\n' > .env    # optional: WANDB_API_KEY, HF_TOKEN, ANTHROPIC_API_KEY
 uv sync                         # install deps
 uv run python run_sweep.py --dry                     # tiny end-to-end + cost projection
 uv run python run_sweep.py --models gemini_3_flash   # one actor

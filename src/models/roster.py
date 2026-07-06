@@ -43,7 +43,7 @@ DISABLED = "disabled"
 FAITHFUL_HINTS = "faithful_hints"
 MONITOR = "monitor"
 
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = Path(os.environ.get("COT_MON_MODELS_CONFIG", _REPO_ROOT / "configs" / "models.yaml"))
 
 _UNSET = object()  # sentinel so callers can override reasoning_enabled to None explicitly
@@ -170,7 +170,7 @@ def build_model(
         # knobs do NOT apply here: no `provider` routing pin and no `reasoning_enabled` model arg (both
         # are OpenRouter extra_body maps). Keep temperature/top_p as-is (not the anthropic strip path).
         # The vLLM thinking toggle / structured no-CoT arm rides on GenerateConfig.extra_body at generate
-        # time (see exp_hints/solver.py NO_COT_VLLM_STRUCTURED), not on a model arg here.
+        # time (see src/exp_hints/solver.py NO_COT_VLLM_STRUCTURED), not on a model arg here.
         margs: dict[str, Any] = dict(extra_model_args)
         # Dedicated endpoint -> push concurrency: inspect defaults max_connections to 10, which would
         # throttle the with-CoT arm below a big --concurrency. Let many requests be in flight (the

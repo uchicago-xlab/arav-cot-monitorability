@@ -15,7 +15,6 @@ Modes: pass `mode="disabled"` (tests — fully no-op, no files, no network) or `
 (writes ./wandb locally, no network) — or set `WANDB_MODE`. No secret ever enters the config: we
 build it from explicit fields only and never dump `os.environ`.
 
-Tested in tests/test_wandb_logger.py.
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ from typing import Any, Iterable
 import wandb
 
 DEFAULT_PROJECT = "cot-monitorability"
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # The CoT-verification table schema — one row per rollout. Keep this list as the
 # single source of truth for column order; `log_rollout` rejects keys outside it.

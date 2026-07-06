@@ -26,9 +26,9 @@ from inspect_ai.model import (ChatMessageAssistant, ChatMessageUser, ContentReas
                               GenerateConfig, ResponseSchema)
 from inspect_ai.util import JSONSchema
 
-from cot_mon.exp_hints.data import MCQItem, _seed_from, index_to_letter, letter_to_index
-from cot_mon.exp_hints.hints import make_complex_hint, make_simple_hint
-from cot_mon.monitors.hint_judge import judge_complex, judge_simple
+from src.exp_hints.data import MCQItem, _seed_from, index_to_letter, letter_to_index
+from src.exp_hints.hints import make_complex_hint, make_simple_hint
+from src.monitors.hint_judge import judge_complex, judge_simple
 
 # no-CoT (necessity) forcing mechanisms — per-actor (roster `no_cot_mechanism`):
 #   "prefill"            prefill the assistant turn with `<answer>` so it commits immediately
@@ -237,7 +237,7 @@ async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_sourc
     if (not with_cot) and no_cot_mechanism == NO_COT_HARMONY_FINAL:
         # gpt-oss self-host: the no-CoT arm can't use the chat endpoint (analysis channel is never
         # skipped there) — force the harmony final channel via raw completions (ZERO analysis tokens).
-        from cot_mon.exp_hints import harmony_nocot
+        from src.exp_hints import harmony_nocot
         gc = getattr(model, "config", None)
         r = await harmony_nocot.force_final_letter(
             model, prompt, n_options=item.n_options,

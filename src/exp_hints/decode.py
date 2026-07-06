@@ -21,8 +21,8 @@ from typing import Any
 
 from inspect_ai.model import ChatMessageAssistant, ChatMessageUser, GenerateConfig
 
-from cot_mon.exp_hints import hints, solver
-from cot_mon.exp_hints.solver import (NO_COT_HARMONY_FINAL, NO_COT_PREFILL, NO_COT_VLLM_STRUCTURED,
+from src.exp_hints import hints, solver
+from src.exp_hints.solver import (NO_COT_HARMONY_FINAL, NO_COT_PREFILL, NO_COT_VLLM_STRUCTURED,
                                       _structured_letter, _VLLM_THINKING_OFF)
 
 N_OPTIONS = 4  # GPQA
@@ -36,7 +36,7 @@ def hint_body(h) -> str:
 def decode_items(family: str, level: int, count: int, rng, *, n_options: int = N_OPTIONS):
     """Build `count` decode probes for (family, level). Returns (UpliftItems, info) where info[i] =
     {id, prompt, target} so a caller can join captured rollouts back to their item + gold letter."""
-    from cot_mon.monitors import uplift_filter as uf
+    from src.monitors import uplift_filter as uf
 
     items, info = [], []
     for i in range(count):
@@ -64,7 +64,7 @@ def _decode_letter_schema(n_options: int = N_OPTIONS):
     carries no MCQItem, so the letters come straight from `n_options` (always A..D for GPQA)."""
     from inspect_ai.model import ResponseSchema
     from inspect_ai.util import JSONSchema
-    from cot_mon.exp_hints.data import index_to_letter
+    from src.exp_hints.data import index_to_letter
 
     letters = [index_to_letter(i) for i in range(n_options)]
     return ResponseSchema(
@@ -108,7 +108,7 @@ def make_sampler(model, *, capture: list | None = None, stats: dict | None = Non
                 prompt + "\n\nReason step by step, then give the final letter in <answer></answer> tags.")
             body = out.completion
         elif harmony_final:                     # forced no-CoT: harmony final-channel force (zero analysis)
-            from cot_mon.exp_hints import harmony_nocot
+            from src.exp_hints import harmony_nocot
             gc = getattr(model, "config", None)
             r = await harmony_nocot.force_final_letter(
                 model, prompt, n_options=n_options,

@@ -32,10 +32,10 @@ logging.getLogger("inspect_ai.model._openrouter_reasoning").setLevel(logging.ERR
 
 from inspect_ai.model import GenerateConfig  # noqa: E402
 
-from cot_mon import metrics  # noqa: E402
-from cot_mon.exp_hints import data, solver  # noqa: E402
-from cot_mon.logging import wandb_logger as wl  # noqa: E402
-from cot_mon.models import roster  # noqa: E402
+from src import metrics  # noqa: E402
+from src.exp_hints import data, solver  # noqa: E402
+from src.logging import wandb_logger as wl  # noqa: E402
+from src.models import roster  # noqa: E402
 
 # The 8 actors behind the 8-actor figures.
 ACTORS = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",

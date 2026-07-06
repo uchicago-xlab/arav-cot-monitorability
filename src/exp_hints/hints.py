@@ -20,7 +20,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
-from cot_mon.exp_hints.data import index_to_letter
+from src.exp_hints.data import index_to_letter
 
 DEFAULT_FAMILY = "arithmetic"   # what the paper uses
 
