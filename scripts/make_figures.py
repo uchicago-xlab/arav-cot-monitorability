@@ -37,13 +37,13 @@ from cot_mon.metrics import load_withcot_rollouts  # noqa: E402  (explicit-selec
 # OpenRouter run is dropped everywhere (per Arav). It carries the plain "gpt-oss-120b" label so the
 # figures keep the earlier composition (one gpt-oss row, no OR/vLLM tags).
 ORDER = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5", "gpt_oss_120b_selfhost",
-         "qwen3_30b", "qwen3_5_122b", "olmo3_32b", "nemotron3_120b",
+         "qwen3_30b", "qwen3_5_122b", "qwen3_32b", "olmo3_32b", "nemotron3_120b",
          "opus_4_8_direct", "gemini_3_1_pro"]
 LABEL = {"gemini_2_5_flash": "gemini-2.5-flash\n(paper)", "gemini_3_flash": "gemini-3-flash",
          "gemini_3_5_flash": "gemini-3.5-flash", "gpt_5_5": "gpt-5.5",
          "gpt_oss_120b_selfhost": "gpt-oss-120b",
-         "qwen3_30b": "qwen3-30b", "qwen3_5_122b": "qwen3.5-122b", "olmo3_32b": "olmo3-32b",
-         "nemotron3_120b": "nemotron3-120b",
+         "qwen3_30b": "qwen3-30b", "qwen3_5_122b": "qwen3.5-122b", "qwen3_32b": "qwen3-32b",
+         "olmo3_32b": "olmo3-32b", "nemotron3_120b": "nemotron3-120b",
          "opus_4_8_direct": "opus-4.8\n(struct no-CoT†)", "gemini_3_1_pro": "gemini-3.1-pro\n(gen-only‡)"}
 LEVELS = ["complex_L1", "complex_L2", "complex_L3"]
 LV_SHORT = {"complex_L1": "L1", "complex_L2": "L2", "complex_L3": "L3"}
@@ -58,12 +58,13 @@ FIGDIR = Path("figures/3p1_replication")
 # reasoning (effort:minimal only REDUCES it, never to 0), so we judge its VISIBLE body, NOT a faithful
 # hidden trace; included as a caveated datapoint per the user, not a faithful-actor headline.
 JUDGEABLE = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",
-             "gpt_oss_120b_selfhost", "qwen3_5_122b", "olmo3_32b", "nemotron3_120b",
+             "gpt_oss_120b_selfhost", "qwen3_5_122b", "qwen3_32b", "olmo3_32b", "nemotron3_120b",
              "opus_4_8_direct", "gemini_3_1_pro"]
 ACTOR_COLOR = {"gemini_2_5_flash": "#444444", "gemini_3_flash": "#1b9e77",
                "gemini_3_5_flash": "#66a61e", "gpt_5_5": "#d95f02",
                "gpt_oss_120b_selfhost": "#7570b3",
-               "qwen3_5_122b": "#a6761d", "olmo3_32b": "#8c564b", "nemotron3_120b": "#17becf",
+               "qwen3_5_122b": "#a6761d", "qwen3_32b": "#e7298a", "olmo3_32b": "#8c564b",
+               "nemotron3_120b": "#17becf",
                "opus_4_8_direct": "#1f78b4", "gemini_3_1_pro": "#999999"}
 
 # Fig 0 transcript SETS — the experiment prefix is the data selector (see resolve_transcript). The

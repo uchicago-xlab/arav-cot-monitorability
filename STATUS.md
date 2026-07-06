@@ -104,6 +104,11 @@ Per-model — **live · reasoning · prefill** (provider in parens):
   - `gemini_3_1_pro` (google-vertex) — summary trace → **generalization-only headline** (caveated, judged body only), not a faithful actor.
 
 ## Drift log (deviations from SPEC/CLAUDE — read first)
+- **qwen3-32b added to fig0/1/3/4/5 (2026-07-06).** It was already in the decode/family graphs; pulled its
+  **arithmetic §3.1 sweep** transcript from W&B (`fw7ruiky`, actor `qwen3_32b_selfhost`) → built the
+  fig0/1/5 transcript + fig3/4 summary (gitignored), and added `qwen3_32b` to `make_figures`
+  ORDER/JUDGEABLE/LABEL/COLOR (`#e7298a`). qwen3-32b now in every clean graph except fig0c + adopt_vs_B;
+  fig1 Δ **+0.03** (mildly positive — conceals a little on the simple cue, unlike the other open actors).
 - **deepseek-v4-flash DROPPED from all graphs (2026-07-06, Arav).** Removed `deepseek_v4_flash` from every
   figure actor list (`make_figures` ORDER/JUDGEABLE/LABEL/COLOR, `make_clean_figures.DECODE_ORDER`,
   `make_complex_figures.ACTOR_ORDER/LABEL`, `make_family_figures._ALL/LABEL`, `assemble.ACTORS`) and
