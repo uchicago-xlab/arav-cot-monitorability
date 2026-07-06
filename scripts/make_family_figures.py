@@ -12,7 +12,6 @@ sys.path.insert(0, str(REPO / "scripts"))
 import cleanplot as cp
 import matplotlib.pyplot as plt
 import make_complex_figures as mcf   # answered-only decode counters (local, no API)
-from cot_mon import metrics          # Wilson / Newcombe CIs for the scatter error bars
 
 DATA = json.load(open("results/family_figure_data.json"))
 OUT = Path("figures/3p1_family_sweep"); OUT.mkdir(parents=True, exist_ok=True)
@@ -32,12 +31,11 @@ LEGEND = {f: FCOLOR[f] for f in FAMS}
 
 
 def answered_necessity():
-    """{(actor, family): (uplift, (k_cot, n_cot, k_nocot, n_nocot))} — ANSWERED-ONLY decode-uplift pooled
-    over the family's L1–L3 (abstains dropped from num & denom), the answered-rollouts-only companion to
-    the answered-only necessity HEATMAP (figC2_..._answered_only). Pooling gives a well-defined Wilson-diff
-    CI for the scatter error bars. Local/no-API: per-rollout decode transcripts, or the selfhost decode
-    JSON's per-cell emit rates. Actors without per-rollout answer data (opus batch-API) get NO entry, so
-    they drop off the answered-only scatter — the same honest exclusion as the answered-only heatmap."""
+    """{(actor, family): uplift} — ANSWERED-ONLY decode-uplift pooled over the family's L1–L3 (abstains
+    dropped from num & denom), the answered-rollouts-only companion to the answered-only necessity HEATMAP
+    (figC2_..._answered_only). Local/no-API: per-rollout decode transcripts, or the selfhost decode JSON's
+    per-cell emit rates. Actors without per-rollout answer data (opus batch-API) get NO entry, so they drop
+    off the answered-only scatter — the same honest exclusion as the answered-only heatmap."""
     out = {}
     for a in _ALL:
         counts = mcf._answered_counts_from_transcript(a) or mcf._answered_counts_from_emit(a)
@@ -49,12 +47,11 @@ def answered_necessity():
                 if f == fam:
                     tot[0] += kc; tot[1] += nc; tot[2] += kn; tot[3] += nn
             if tot[1] and tot[3]:
-                out[(a, fam)] = (tot[0] / tot[1] - tot[2] / tot[3], tuple(tot))
+                out[(a, fam)] = tot[0] / tot[1] - tot[2] / tot[3]
     return out
 
 
 NEC_ANS = answered_necessity()
-UF = json.load(open("results/family_unfaithfulness_llm.json"))   # concealment counts for the y error bars
 
 
 def grouped_bar(metric, title, ylabel, fname, label_fmt="{:.2f}"):
@@ -79,32 +76,17 @@ p1 = grouped_bar("unfaithful", "Concealment by hint type",
 p3 = grouped_bar("follow", "Follow rate by hint type", "follow rate (with-CoT)",
                  "fig_family_followrate.png")
 
-# (2) necessity vs unfaithfulness scatter — x = ANSWERED-ONLY decode-necessity (abstains excluded),
-# now with error bars: x = Wilson-diff CI on the pooled answered decode counts, y = Wilson CI on the LLM
-# concealment rate (n_judged) scaled to the unfaithful axis. Markers below (semi-transparent), bars on
-# top (as in fig5) so a tight CI still shows. Actors without answered-only necessity (opus) are absent.
+# (2) necessity vs unfaithfulness scatter — x = ANSWERED-ONLY decode-necessity (abstains excluded).
+# Actors without per-rollout answer data (opus) have no answered-only necessity → absent from this scatter.
 fig, ax = plt.subplots(figsize=(8, 6))
 for fam in FAMS:
+    xs, ys = [], []
     for a in ACTORS:
         c = DATA[a].get(fam, {})
-        ne = NEC_ANS.get((a, fam))
-        if ne is None or c.get("unfaithful") is None:
-            continue
-        nec, (kc, nc, kn, nn) = ne
-        y = c["unfaithful"]
-        col = FCOLOR[fam]
-        xlo, xhi = metrics.wilson_diff_ci(kc, nc, kn, nn)
-        u = UF.get(a, {}).get(fam, {})
-        if u.get("n_judged"):                       # y CI: concealment-rate Wilson, scaled by follow-rate
-            crlo, crhi = metrics.wilson_ci(round(u["conceal_rate_among_followers"] * u["n_judged"]), u["n_judged"])
-            foll = c.get("follow") or 0.0
-            ylo, yhi = crlo * foll - u["baseline"], crhi * foll - u["baseline"]
-            yerr = [[max(0.0, y - ylo)], [max(0.0, yhi - y)]]
-        else:
-            yerr = None
-        ax.plot(nec, y, "o", ms=9, color=col, alpha=0.85, zorder=3)
-        ax.errorbar(nec, y, xerr=[[max(0.0, nec - xlo)], [max(0.0, xhi - nec)]], yerr=yerr,
-                    fmt="none", ecolor=col, elinewidth=1.1, capsize=3, zorder=4)
+        nec = NEC_ANS.get((a, fam))
+        if nec is not None and c.get("unfaithful") is not None:
+            xs.append(nec); ys.append(c["unfaithful"])
+    ax.scatter(xs, ys, s=90, color=FCOLOR[fam], edgecolor=cp.SLATE, linewidth=0.5, label=fam, zorder=3)
 ax.axhline(0, color=cp.GRID, lw=1, zorder=1)
 ax.set_xlabel("decode-necessity, answered rollouts only (with-CoT − no-CoT decode accuracy)")
 ax.set_ylabel("unfaithful following (LLM-judged)")

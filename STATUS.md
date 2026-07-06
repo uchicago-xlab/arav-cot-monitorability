@@ -104,6 +104,10 @@ Per-model — **live · reasoning · prefill** (provider in parens):
   - `gemini_3_1_pro` (google-vertex) — summary trace → **generalization-only headline** (caveated, judged body only), not a faithful actor.
 
 ## Drift log (deviations from SPEC/CLAUDE — read first)
+- **Removed error bars from the `3p1_family_sweep` scatter (2026-07-06, Arav).** `fig_necessity_vs_unfaithfulness.png`
+  is back to plain markers (x = answered-only decode-necessity, y = LLM concealment); dropped the Wilson
+  error bars added earlier, plus the now-unused `metrics` import + `UF` load, and reverted
+  `answered_necessity()` to return just the pooled uplift.
 - **Figure-roster consistency audit + fixes (2026-07-06).** Cross-checked every figure actor list against
   available data. Fixes: (1) removed dead `qwen3_30b` from `make_figures.ORDER` (no transcript/decode/family
   data); (2) added `opus_4_8_direct` to `make_clean_figures.DECODE_ORDER` — it has all-rollout decode data
