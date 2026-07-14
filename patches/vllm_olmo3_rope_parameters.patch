@@ -1,0 +1,39 @@
+vLLM 0.25.0 cannot serve Olmo-3 with transformers>=5: KeyError: 'rope_theta'.
+
+vLLM routes Olmo3ForCausalLM -> models/olmo2.py (registry.py:173), whose Olmo2Attention expects a
+FLAT `config.rope_parameters`. transformers 5.13's Olmo3Config always nests rope_parameters by layer
+type ({'full_attention': {yarn...}, 'sliding_attention': {'rope_type':'default','rope_theta':...}}),
+so `config.rope_parameters["rope_theta"]` KeyErrors on every sliding-attention layer. vLLM pins
+transformers>=5.5.3 with no upper bound, so nothing catches it.
+
+The fix is a 1:1 translation, not a guess: vLLM already derives its sliding/full branch from
+config.layer_types[layer_idx] == "sliding_attention" -- the SAME layer-type keys transformers now
+uses to nest rope_parameters. Flat (Olmo2) configs keep the original path.
+
+Apply to: /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/olmo2.py (~line 139)
+
+--- a/vllm/model_executor/models/olmo2.py
++++ b/vllm/model_executor/models/olmo2.py
+@@ -139,10 +139,16 @@
+         # Rotary embeddings. Rope scaling is only applied on full attention layers.
+-        if sliding_window is None:
+-            rope_parameters = self.config.rope_parameters
+-        else:
+-            rope_theta = self.config.rope_parameters["rope_theta"]
+-            rope_parameters = {"rope_type": "default", "rope_theta": rope_theta}
++        # transformers>=5 nests rope_parameters per layer type (Olmo3); older/Olmo2
++        # configs keep it flat.
++        _rp = self.config.rope_parameters
++        if "full_attention" in _rp or "sliding_attention" in _rp:
++            _key = "full_attention" if sliding_window is None else "sliding_attention"
++            rope_parameters = _rp[_key]
++        elif sliding_window is None:
++            rope_parameters = _rp
++        else:
++            rope_theta = _rp["rope_theta"]
++            rope_parameters = {"rope_type": "default", "rope_theta": rope_theta}
+         self.rotary_emb = get_rope(
+             self.head_dim,
+             max_position=self.max_position_embeddings,
+             rope_parameters=rope_parameters,
+         )

@@ -236,3 +236,4 @@ wandb/
 # retired figure layout (figure scripts may regenerate these)
 /figures/clean/
 /figures/3p1_*/
+logs/transcripts_live/

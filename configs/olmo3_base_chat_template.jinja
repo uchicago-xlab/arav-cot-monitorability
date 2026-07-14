@@ -1,0 +1,27 @@
+{#-
+  Minimal PASSTHROUGH chat template for allenai/Olmo-3-1125-32B (the PRETRAINED base checkpoint).
+
+  The base repo ships NO chat template, so vLLM 400s on /v1/chat/completions without one. This is a
+  harness ADAPTATION and must be recorded as such: the base point (if any) is measured through a
+  template we authored, the other three through templates their authors shipped.
+
+  It emits the message text verbatim and NOTHING ELSE — no role scaffolding, no generation cue.
+
+  This is deliberate and was learned the hard way. An earlier version framed turns as
+  "Question: ...\n\nAnswer:" — and that trailing "Answer:" primed the base LM to emit the ANSWER
+  FIRST and reason afterwards. Since the judged trace is extract_cot(body) = everything BEFORE
+  <answer>, the CoT measured as ~0.1 chars and base looked like a checkpoint incapable of reasoning.
+  It is not: given the bare prompt it produces 16k+ chars of genuine chain-of-thought. Any generation
+  cue that suggests an immediate answer FABRICATES the absence of a CoT.
+
+  * No <think>: the Think templates force one open; base has no thinking behaviour, and injecting
+    <think> would fabricate the very trace we are testing for.
+  * The assistant turn is left OPEN (no eos, no cue): a trailing assistant message renders as a bare
+    prefix, so the no-CoT `<answer>` prefill (continue_final_message) still works.
+-#}
+{%- for message in messages -%}
+{{ message['content'] }}
+{%- if not loop.last %}
+
+{% endif -%}
+{%- endfor -%}

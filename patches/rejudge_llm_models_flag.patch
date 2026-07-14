@@ -1,0 +1,45 @@
+Changes made to `scripts/rejudge_llm.py` during the OLMo post-training ablation.
+
+`scripts/rejudge_llm.py` is NOT tracked in this repo (it is absent from origin/main — the scrubbed
+public-release state) and the remote is public, so the change ships as a patch rather than by
+committing the file. Apply it to your working copy on the main machine.
+
+WHY THE --models FLAG MATTERS: rejudge_llm walks every actor in FILTERED_ACTORS and rewrites the
+matching transcript's judge_verdict IN PLACE. `olmo3_32b`'s transcript is present and already
+LLM-judged, so a default run re-judges the RLVR point and overwrites the verdicts the 4th fig5 point
+depends on (and bills for it). --models scopes a re-judge to the NEW actors.
+
+Used as:
+    uv run python scripts/rejudge_llm.py --monitor gemini_3_flash --models olmo_32b_sft
+    uv run python scripts/rejudge_llm.py --monitor gemini_3_flash --models olmo_32b_dpo
+    uv run python scripts/rejudge_llm.py --monitor gemini_3_flash --models olmo_32b_base
+
+--- a/scripts/rejudge_llm.py
++++ b/scripts/rejudge_llm.py
+@@ -35,7 +35,9 @@
+ FILTERED_ACTORS = ["gemini_2_5_flash", "gemini_3_flash", "gemini_3_5_flash", "gpt_5_5",
+                    "gpt_oss_120b_selfhost", "qwen3_5_122b", "qwen3_32b", "olmo3_32b", "nemotron3_120b",
+-                   "opus_4_8_direct", "gemini_3_1_pro"]
++                   "opus_4_8_direct", "gemini_3_1_pro",
++                   "olmo_32b_sft", "olmo_32b_dpo", "olmo_32b_base"]   # post-training ablation
+ SETS = {"filtered": ("exp_hints_sweep", FILTERED_ACTORS)}
+ N_OPT = 4
+
+@@ -119,6 +121,18 @@ async def main():
+     ap.add_argument("--monitor", default="gemini_3_flash")
+     ap.add_argument("--limit", type=int, default=0, help="followers/cell/file (0 = all)")
+     ap.add_argument("--concurrency", type=int, default=12)
+     ap.add_argument("--no-write", action="store_true")
++    ap.add_argument("--models", nargs="*", default=None,
++                    help="restrict to these actors (default: every actor in the set). Scope a "
++                         "re-judge to NEW actors with this — the default list includes already-judged "
++                         "transcripts (e.g. olmo3_32b) and re-running would overwrite their verdicts "
++                         "in place.")
+     args = ap.parse_args()
+     BACKUP.mkdir(parents=True, exist_ok=True)
++    if args.models:
++        unknown = [m for m in args.models if m not in FILTERED_ACTORS]
++        if unknown:   # a typo'd slug would otherwise silently judge nothing
++            raise SystemExit(f"--models not in FILTERED_ACTORS: {unknown}")
++        for _set, (_exp, _actors) in SETS.items():
++            SETS[_set] = (_exp, [a for a in _actors if a in args.models])

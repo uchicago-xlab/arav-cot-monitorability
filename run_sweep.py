@@ -128,14 +128,30 @@ async def run_actor(name, args):
             Path(f"logs/sweep_{name}{tg}.json").write_text(json.dumps({"summary": summ, "meta": meta}, indent=2, default=str))
         return summ, meta
 
+    # ONE semaphore for the whole actor run, and all items dispatched at once: the sweep keeps a
+    # standing backlog so `--concurrency` rollouts are ALWAYS in flight. (Previously each item was
+    # awaited in turn with its own semaphore, so in-flight collapsed to zero at every item boundary
+    # while the batch waited on its slowest long-CoT rollout — the GPU idled once per item, and for
+    # the arithmetic sweep only 100 coroutines even existed per item, capping --concurrency at 100.)
+    sem = asyncio.Semaphore(args.concurrency)
+    done = 0
+
+    async def _sweep_item(coro_fn, it, total, note=""):
+        nonlocal done
+        recs = await coro_fn(it)
+        done += 1
+        if done % 10 == 0:
+            print(f"  [{name}] ... {done}/{total} items swept{note}", flush=True)
+        return recs
+
     if args.share_baseline:   # none/simple + filter paid ONCE, complex per family
-        records_all = []
-        for i, it in enumerate(kept):
-            records_all += await solver.run_sweep_multi(model, it, n_samples=args.n_samples,
+        note = f" (shared baseline, {len(args.families)} fam)"
+        per_item = await asyncio.gather(*(
+            _sweep_item(lambda it: solver.run_sweep_multi(model, it, n_samples=args.n_samples,
                 families=tuple(args.families), levels=levels, seed=args.seed, cot_source=cot_source,
-                concurrency=args.concurrency, no_cot_mechanism=no_cot_mechanism)
-            if (i + 1) % 10 == 0:
-                print(f"  [{name}] ... {i + 1}/{len(kept)} items swept (shared baseline, {len(args.families)} fam)", flush=True)
+                concurrency=sem, no_cot_mechanism=no_cot_mechanism), it, len(kept), note)
+            for it in kept))
+        records_all = [r for sub in per_item for r in sub]   # gather preserves item order
         wall = time.monotonic() - t0
         base = [r for r in records_all if r.hint_kind in ("none", "simple")]
         summary = meta = None
@@ -149,13 +165,13 @@ async def run_actor(name, args):
         meta["n_gen_incl_filter"] = len(records_all) + (len(items) * args.filter_samples if not args.no_filter else 0)
         return summary, meta
 
-    records = []
-    for i, it in enumerate(kept):
-        records += await solver.run_sweep(model, it, n_samples=args.n_samples, levels=levels,
-                                          family=args.family, seed=args.seed, cot_source=cot_source,
-                                          concurrency=args.concurrency, no_cot_mechanism=no_cot_mechanism)
-        if (i + 1) % 10 == 0:
-            print(f"  [{name}] ... {i + 1}/{len(kept)} items swept", flush=True)
+    per_item = await asyncio.gather(*(
+        _sweep_item(lambda it: solver.run_sweep(model, it, n_samples=args.n_samples, levels=levels,
+                                                family=args.family, seed=args.seed, cot_source=cot_source,
+                                                concurrency=sem, no_cot_mechanism=no_cot_mechanism),
+                    it, len(kept))
+        for it in kept))
+    records = [r for sub in per_item for r in sub]           # gather preserves item order
     summary, meta = await _finalize(args.family, records, time.monotonic() - t0)
     meta = dict(meta); meta["n_gen_incl_filter"] = len(records) + (len(items) * args.filter_samples if not args.no_filter else 0)
     return summary, meta

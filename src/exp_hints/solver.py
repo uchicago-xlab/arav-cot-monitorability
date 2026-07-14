@@ -53,6 +53,7 @@ from src.monitors.hint_judge import judge_complex, judge_simple
 #                        `<|channel|>final<|message|><answer>`) -> ZERO analysis tokens by construction
 #                        (see exp_hints/harmony_nocot.py). Bypasses inspect's chat path for this arm.
 NO_COT_PREFILL = "prefill"
+NO_COT_PREFILL_CONTINUE = "prefill_continue"
 NO_COT_STRUCTURED = "structured_output"
 NO_COT_VLLM_STRUCTURED = "vllm_structured"
 NO_COT_HARMONY_FINAL = "harmony_final"
@@ -60,11 +61,24 @@ NO_COT_HARMONY_FINAL = "harmony_final"
 # vLLM thinking-disable extra_body (chat_template_kwargs) — forwarded via GenerateConfig.extra_body,
 # which inspect's openai-api provider passes straight to the OpenAI-compatible request body.
 _VLLM_THINKING_OFF = {"chat_template_kwargs": {"enable_thinking": False}}
+# Olmo-3's chat template force-opens a <think> block on every generation prompt
+# ('<|im_start|>assistant\n<think>'), and closes a trailing assistant turn with eos_token. A plain
+# prefill therefore renders as `assistant\n<answer><eos>` + a NEW `assistant\n<think>` turn — the
+# model is dropped inside a think block by construction and reasons anyway (zero-reasoning on only
+# ~40% of rollouts). Asking vLLM to CONTINUE the final message instead suppresses both the eos and
+# the new generation prompt, so `<answer>` is a true prefix and the trace is genuinely empty.
+_VLLM_CONTINUE_FINAL = {"continue_final_message": True, "add_generation_prompt": False}
 
 
-async def _bounded_gather(coros, limit: int):
-    """Run coroutines concurrently, capped at `limit` in flight (rate-limit hygiene)."""
-    sem = asyncio.Semaphore(limit)
+async def _bounded_gather(coros, limit: "int | asyncio.Semaphore"):
+    """Run coroutines concurrently, capped at `limit` in flight (rate-limit hygiene).
+
+    `limit` may be an int (a fresh per-call semaphore — the old behaviour) OR a shared
+    asyncio.Semaphore. Pass a SHARED one to keep a single backlog across many calls: a per-call
+    semaphore lets each item drain to zero in-flight while it waits on its slowest rollout, which
+    idles the GPU at every item boundary. With one semaphore hoisted over the whole actor run, the
+    next item's rollouts are already queued and slot straight in."""
+    sem = limit if isinstance(limit, asyncio.Semaphore) else asyncio.Semaphore(limit)
 
     async def _run(c):
         async with sem:
@@ -226,7 +240,10 @@ async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_sourc
     body_channel/disabled actors (CoT in `.completion`). The ANSWER is always parsed from the body.
     The with-CoT arm NEVER prefills (so a thinking model's trace is not truncated). The no-CoT
     necessity arm forces an immediate answer via `no_cot_mechanism`: "prefill" (default — prefill
-    `<answer>`), "structured_output" (a single-letter enum schema, for actors that 400 on prefill
+    `<answer>`), "prefill_continue" (that same prefill, but asking vLLM to CONTINUE the final
+    message — required by templates that force-open a `<think>` block on the generation prompt, as
+    Olmo-3's does; a plain prefill there closes the turn and the model reasons anyway),
+    "structured_output" (a single-letter enum schema, for actors that 400 on prefill
     such as Opus 4.8), "vllm_structured" (that same schema PLUS the vLLM enable_thinking:false
     disable, for the self-hosted qwen3.5 actor, which also rejects prefill), or "harmony_final" (the
     self-hosted gpt-oss actor: force the harmony `final` channel via raw /v1/completions -> zero
@@ -261,7 +278,12 @@ async def run_condition(model, item: MCQItem, hint, *, with_cot: bool, cot_sourc
         out = await model.generate(prompt, config=cfg)
         body = out.completion
     else:                                   # force early answer: prefill the assistant turn
-        out = await model.generate([ChatMessageUser(content=prompt), ChatMessageAssistant(content="<answer>")])
+        pre = [ChatMessageUser(content=prompt), ChatMessageAssistant(content="<answer>")]
+        if no_cot_mechanism == NO_COT_PREFILL_CONTINUE:   # vLLM actors whose template force-opens <think>
+            cfg = GenerateConfig(extra_body=_VLLM_CONTINUE_FINAL)
+            out = await model.generate(pre, config=cfg)
+        else:
+            out = await model.generate(pre)
         body = "<answer>" + out.completion
     reasoning = extract_reasoning(out)
     if structured:
