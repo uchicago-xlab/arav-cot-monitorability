@@ -21,7 +21,7 @@ load_dotenv(_REPO_ROOT / ".env")
 
 import wandb  # noqa: E402
 
-ACTORS = ["olmo_32b_base", "olmo_32b_sft", "olmo_32b_dpo"]
+ACTORS = ["olmo_32b_base", "olmo_32b_sft", "olmo_32b_dpo", "olmo3_32b"]
 EXPECTED_JUDGE = "llm:gemini_3_flash"
 
 
@@ -57,7 +57,11 @@ def main():
             files.append(p)
 
     # 3. the derived trajectory + gate evidence + judge deltas (also in git, shipped for convenience)
+    import glob as _g
+    for pth in _g.glob(str(_REPO_ROOT / "results/item_screen/screen_*.json")):
+        files.append(Path(pth))
     for rel in ["results/olmo_posttraining_trajectory.json",
+                "results/olmo_item_set.json",
                 "results/gate1_llm_judge_deltas.json",
                 "results/gate0_olmo_32b_sft.json",
                 "results/gate0_olmo_32b_base.json",

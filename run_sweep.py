@@ -79,17 +79,39 @@ async def run_actor(name, args):
           f"{', share-baseline x' + str(len(args.families)) + ' families' if args.share_baseline else ''}"
           f"{', cache_prompt' if margs else ''}) ===", flush=True)
 
-    items = data.load_gpqa(n=args.candidates)
+    load = data.load_mmlu_pro if args.dataset == "mmlu_pro" else data.load_gpqa
     t0 = time.monotonic()
-    if args.no_filter:
-        kept = items[:args.n_items]
+    if args.items:
+        # FIXED item set (scripts/select_item_set.py): every checkpoint sweeps the SAME items, so
+        # each contrast is item-paired and no part of the trajectory is item COMPOSITION. Filtering
+        # per-checkpoint instead gives each actor its own kept set (they overlapped only ~50/60 on
+        # GPQA, 28/60 across all four) and silently confounds the comparison. No filter is run here:
+        # the items were already screened on every checkpoint.
+        want = json.loads(Path(args.items).read_text())
+        ids = want["item_ids"] if isinstance(want, dict) else want
+        pool = load(n=args.item_pool)
+        by_id = {it.id: it for it in pool}
+        missing = [i for i in ids if i not in by_id]
+        if missing:
+            raise SystemExit(f"--items: {len(missing)} ids not found in the {args.dataset} pool "
+                             f"(raise --item-pool; first missing: {missing[:2]})")
+        items = kept = [by_id[i] for i in ids]
         rates = {}
+        print(f"  [{name}] FIXED item set: {len(kept)} items from {args.items} (no per-actor filter)",
+              flush=True)
     else:
-        kept, rates = await solver.correct_with_cot(model, items, n_samples=args.filter_samples,
-                                                    threshold=args.min_correct, concurrency=args.concurrency,
-                                                    min_emission=args.min_emission)
-        kept = kept[:args.n_items]
-    print(f"  [{name}] filter: kept {len(kept)}/{len(items)} (correct-with-CoT >= {args.min_correct})", flush=True)
+        items = load(n=args.candidates)
+        if args.no_filter:
+            kept = items[:args.n_items]
+            rates = {}
+        else:
+            kept, rates = await solver.correct_with_cot(model, items, n_samples=args.filter_samples,
+                                                        threshold=args.min_correct, concurrency=args.concurrency,
+                                                        min_emission=args.min_emission,
+                                                        max_threshold=args.max_correct)
+            kept = kept[:args.n_items]
+        print(f"  [{name}] filter: kept {len(kept)}/{len(items)} (correct-with-CoT >= {args.min_correct}"
+              f"{f', <= {args.max_correct}' if args.max_correct else ''})", flush=True)
     if not kept:
         print(f"  [{name}] no items survived the filter."); return None, None
 
@@ -264,6 +286,19 @@ if __name__ == "__main__":
                     help="Anthropic prompt caching (direct-Claude actors only, e.g. "
                          "opus_4_8_direct) — caches the metadata+question prefix across a cell's samples.")
     ap.add_argument("--candidates", type=int, default=120, help="items loaded before the correct-with-CoT filter")
+    ap.add_argument("--dataset", default="gpqa", choices=["gpqa", "mmlu_pro"],
+                    help="mmlu_pro: ~10 options/item, so the no-hint baseline (coincidentally picking "
+                         "the planted letter) is much lower than 4-way GPQA -> more hint signal per rollout")
+    ap.add_argument("--items", default=None,
+                    help="JSON with an item_ids list (scripts/select_item_set.py). Sweeps EXACTLY those "
+                         "items and runs NO per-actor filter, so every checkpoint sees an identical set "
+                         "and every contrast is item-paired.")
+    ap.add_argument("--item-pool", type=int, default=2000,
+                    help="how many dataset items to load when resolving --items ids")
+    ap.add_argument("--max-correct", type=float, default=None,
+                    help="PERSUADABLE band: also require correct-with-CoT <= this. Items the model always "
+                         "gets right have follow-rate BELOW the no-hint baseline, so they contribute "
+                         "negative hint-attributable signal while consuming full budget.")
     ap.add_argument("--filter-samples", type=int, default=4)
     ap.add_argument("--min-correct", type=float, default=0.5)
     ap.add_argument("--min-emission", type=float, default=None,

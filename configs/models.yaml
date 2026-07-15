@@ -142,3 +142,12 @@ actors:
     necessity: na
     no_cot_mechanism: prefill_continue
     experiments: [hints]
+  olmo3_32b:
+    id: openai-api/vllm/olmo3_32b
+    provider: null
+    cot_access: native_raw
+    reasoning_enabled: null
+    tier: faithful_hints
+    necessity: confirmed
+    no_cot_mechanism: prefill_continue
+    experiments: [hints]

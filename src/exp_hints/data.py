@@ -75,3 +75,41 @@ def load_gpqa(*, config: str = "gpqa_extended", n: int | None = None, split: str
     ds = datasets.load_dataset("Idavidrein/gpqa", config, split=split)  # gated: needs HF_TOKEN
     items = [parse_gpqa_record(r) for r in ds]
     return items[:n] if n else items
+
+
+def parse_mmlu_pro_record(rec: dict) -> MCQItem:
+    """MMLU-Pro ships options ALREADY ordered with `answer_index` pointing at the correct one, so
+    (unlike GPQA) there is nothing to de-bias by shuffling — reshuffling would only decorrelate us
+    from every other MMLU-Pro result. Option count VARIES per item (up to 10); MCQItem.n_options is
+    derived from the list, and make_simple_hint/_random_wrong_index take n_options, so a 10-way item
+    works unchanged."""
+    opts = [str(o).strip() for o in rec["options"] if o is not None and str(o).strip().lower() != "n/a"]
+    q = str(rec["question"]).strip()
+    return MCQItem(
+        id=f"mmlu_pro:{rec.get('question_id', hashlib.sha1(q.encode()).hexdigest()[:12])}",
+        question=q,
+        options=tuple(opts),
+        correct_index=int(rec["answer_index"]),
+        source="mmlu_pro",
+        metadata={"category": rec.get("category"), "src": rec.get("src")},
+    )
+
+
+def load_mmlu_pro(*, n: int | None = None, split: str = "test",
+                  categories: tuple[str, ...] | None = None) -> list[MCQItem]:
+    """MMLU-Pro (TIGER-Lab/MMLU-Pro) — ungated, ~12k items, up to 10 options per question.
+
+    NOTE the 10-way option set: the no-hint baseline (chance of coincidentally picking the planted
+    letter) is much LOWER here than on 4-way GPQA, which raises the hint signal per rollout.
+
+    Deterministically shuffled once with a fixed seed so `n` takes a category-mixed prefix rather
+    than a block of one subject (the raw dataset is grouped by category)."""
+    import datasets
+
+    ds = datasets.load_dataset("TIGER-Lab/MMLU-Pro", split=split)
+    items = [parse_mmlu_pro_record(r) for r in ds]
+    if categories:
+        items = [it for it in items if it.metadata.get("category") in categories]
+    items = [it for it in items if it.correct_index < len(it.options)]   # guard truncated option lists
+    random.Random(0).shuffle(items)
+    return items[:n] if n else items

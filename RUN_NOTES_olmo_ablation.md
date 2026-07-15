@@ -180,3 +180,72 @@ verdicts are backed up in `logs/transcripts_pre_llm_backup/`.
 - Per-item live logging to `logs/transcripts_live/` — skipped: runs were ≤2.5 h and W&B writes the
   transcript at `finish()`, so the crash-recovery value did not justify patching the hot path.
 - Figures — the main machine renders them. Nothing here ran `make_*figures.py`.
+
+---
+
+# MMLU-Pro re-run (2026-07-14) — tighter CIs + cross-dataset replication
+
+Arav's call: switch the paper's fig5 to MMLU-Pro, 100 shared items, 20 samples, all four checkpoints
+on the SAME fixed item set. Motivation: the GPQA run's error bars were too wide (SFT ±0.24, base
+uninformative). This run cut them ~2x AND tests whether the finding replicates on a second dataset.
+
+## What changed vs the GPQA run
+- **Dataset = MMLU-Pro** (`data.load_mmlu_pro`). ~10 options/item vs GPQA's 4, so the no-hint
+  baseline (coincidental pick of the planted letter) collapses from ~0.09 to ~0.01 -> far more hint
+  signal per rollout.
+- **Fixed, shared 100-item set** (`results/olmo_item_set.json`, built by `select_item_set.py`).
+  Every checkpoint sweeps identical items, so every contrast is item-PAIRED. Selection = validity
+  (all four answer correctly-with-CoT >=0.5) + power (ranked hardest-first by mean SFT/DPO/RLVR
+  accuracy). Base is EXCLUDED from the rank key: an all-four pooled mean lets base's low accuracy
+  mask items the tuned checkpoints are certain about (measured: 351/411 SFT-certain items sat inside
+  a [0.5,0.95] pooled band). Ranking flipped composition from 16% -> 57% persuadable.
+- **32K serving context** (`--max-model-len 32768`, client `--max-tokens 30000`) — matches RLVR's
+  original endpoint; the 65536 in the first run was the deviation.
+- **20 samples/cell** (was 10). 100 items x 20 x 2 conds x 2 arms = 8,000 gens/checkpoint.
+- **NEW base prompt** (`configs/olmo3_base_chat_template.jinja`): document-continuation framing +
+  3 hint-NEUTRAL few-shot exemplars, ends on "Reasoning:" so the trace comes before the answer.
+  Lifted base emission 55% -> 100% and killed the degenerate rambling (mean CoT 4.7k chars of real
+  reasoning vs 30k+ of repetition). Exemplars carry NO metadata block, so we teach FORMAT not the
+  cue. Applied to base ONLY — verified from the vLLM logs that SFT/DPO/RLVR never load it.
+- **Screening cascade** (`screen_items.py` + `run_cascade.sh`): base->SFT->DPO->RLVR, each stage
+  screening only prior survivors, stop-early, streaming (one shared semaphore, no chunk barrier),
+  incremental saves + resume. Base first because it is cheapest AND most selective (54%).
+
+## Result (judge = llm:gemini_3_flash on every point)
+| point | follow (x) | conceal (y) | y 95% CI | followers | hint-attributable | emit |
+|---|---|---|---|---|---|---|
+| pretrained | 0.105 | 0.781 | [0.67,0.86] | 210 | 119 | 100% |
+| SFT | 0.191 | 0.432 | [0.38,0.49] | 381 | 359 | 100% |
+| DPO | 0.147 | 0.568 | [0.51,0.63] | 294 | 278 | 100% |
+| RLVR | 0.101 | 0.511 | [0.43,0.59] | 201 | 180 | 100% |
+
+CI width vs GPQA: SFT 0.24->0.11, DPO 0.16->0.12, RLVR 0.30->0.16, base [0.25,1.00]->0.19.
+
+## Paired contrasts (same 100 items — the defensible claim)
+- pretrained -> SFT : dy = -0.349  [-0.467,-0.215]  **SIGNIFICANT** (SFT reduces concealment)
+- SFT -> DPO        : dy = +0.138  [+0.044,+0.235]  **SIGNIFICANT** (DPO raises it back)
+- DPO -> RLVR       : dy = -0.053  [-0.173,+0.072]  n.s. (plateau)
+- SFT -> RLVR       : dy = +0.086  [-0.055,+0.236]  n.s.
+
+## The finding
+Concealment is **U-shaped** across post-training: present in the pretrained base, significantly
+suppressed by SFT (instruction-tuning makes the model forthcoming), significantly restored by DPO,
+flat through RLVR. Follow-rate is created by SFT (peaks 0.19) then trained down (0.15 -> 0.10). The
+**SFT->DPO concealment rise** and the **monotonic follow-rate decline** BOTH replicate the GPQA run's
+direction on a different dataset + option count — the strongest form the result can take.
+
+Cross-dataset (concealment): SFT 0.80->0.43, DPO 0.89->0.57, RLVR 0.83->0.51. Absolute levels are
+much lower on MMLU-Pro (10-way options make a planted answer more conspicuous); only the DIRECTION is
+stable. A single-dataset concealment number is not a model constant.
+
+## Caveats
+- **base->SFT drop carries a harness-difference confound**: base uses our authored few-shot template,
+  the others their shipped templates. The SFT->DPO->RLVR contrasts do NOT (all shipped templates).
+- base is body_channel (no reasoning parser); the tuned three are native_raw. Both are the full trace.
+- RLVR is the 3.1 refresh; not a strict descendant of the Olmo-3 SFT/DPO checkpoints.
+
+## Regenerated artifacts
+- `results/olmo_posttraining_trajectory.json` (augmented: per-point + paired contrasts + cross-dataset)
+- `results/olmo_item_set.json`, `results/item_screen/screen_*.json` (the 4 screens)
+- `results/gate1_llm_judge_deltas.json` (regex->LLM deltas; LLM under-detects ~2x again)
+- MMLU-Pro transcripts in `logs/transcripts/` (GPQA ones archived to `logs/transcripts_gpqa/`).
