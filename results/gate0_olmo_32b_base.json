@@ -1,0 +1,25 @@
+{
+  "actor": "olmo_32b_base",
+  "cot_access": "body_channel",
+  "cot_source": "body",
+  "sampling": {
+    "temperature": 0.0,
+    "seed": 0,
+    "max_tokens": 32000
+  },
+  "n_items": 15,
+  "withcot": {
+    "n": 15,
+    "n_error": 0,
+    "first_error": null,
+    "emission": 0.533,
+    "zero_reasoning_frac": 0.067,
+    "mean_reasoning_chars": 51815.5,
+    "max_reasoning_chars": 125316
+  },
+  "withcot_pass": false,
+  "no_cot_mechanisms": {},
+  "no_cot_mechanism_selected": null,
+  "emission_only": true,
+  "gate0_pass": false
+}

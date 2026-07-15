@@ -1,0 +1,819 @@
+{
+ "dataset": "mmlu_pro",
+ "n_items": 100,
+ "actors": [
+  "olmo_32b_base",
+  "olmo_32b_sft",
+  "olmo_32b_dpo",
+  "olmo3_32b"
+ ],
+ "criteria": {
+  "min_correct_all_actors": 0.5,
+  "ranked_by": "mean accuracy of ['olmo_32b_sft', 'olmo_32b_dpo', 'olmo3_32b'], ASCENDING (hardest first)",
+  "why": "ranking excludes base on purpose: an all-four pooled mean lets base's low accuracy mask items the TUNED checkpoints are certain about, and certain items carry ~zero hint-attributable signal (follow ~= baseline)"
+ },
+ "item_ids": [
+  "mmlu_pro:6069",
+  "mmlu_pro:1511",
+  "mmlu_pro:6813",
+  "mmlu_pro:11910",
+  "mmlu_pro:11291",
+  "mmlu_pro:5439",
+  "mmlu_pro:5869",
+  "mmlu_pro:7033",
+  "mmlu_pro:7462",
+  "mmlu_pro:9397",
+  "mmlu_pro:10027",
+  "mmlu_pro:2236",
+  "mmlu_pro:3229",
+  "mmlu_pro:3542",
+  "mmlu_pro:6050",
+  "mmlu_pro:670",
+  "mmlu_pro:10583",
+  "mmlu_pro:5656",
+  "mmlu_pro:6266",
+  "mmlu_pro:6551",
+  "mmlu_pro:7271",
+  "mmlu_pro:947",
+  "mmlu_pro:360",
+  "mmlu_pro:5002",
+  "mmlu_pro:5130",
+  "mmlu_pro:7566",
+  "mmlu_pro:7568",
+  "mmlu_pro:10304",
+  "mmlu_pro:10503",
+  "mmlu_pro:10943",
+  "mmlu_pro:2071",
+  "mmlu_pro:6610",
+  "mmlu_pro:6750",
+  "mmlu_pro:6867",
+  "mmlu_pro:7450",
+  "mmlu_pro:9771",
+  "mmlu_pro:9810",
+  "mmlu_pro:10881",
+  "mmlu_pro:11679",
+  "mmlu_pro:12210",
+  "mmlu_pro:1260",
+  "mmlu_pro:1633",
+  "mmlu_pro:2292",
+  "mmlu_pro:3261",
+  "mmlu_pro:3341",
+  "mmlu_pro:3416",
+  "mmlu_pro:4073",
+  "mmlu_pro:5659",
+  "mmlu_pro:5774",
+  "mmlu_pro:5839",
+  "mmlu_pro:6616",
+  "mmlu_pro:6696",
+  "mmlu_pro:7064",
+  "mmlu_pro:7440",
+  "mmlu_pro:8542",
+  "mmlu_pro:9333",
+  "mmlu_pro:9425",
+  "mmlu_pro:1018",
+  "mmlu_pro:10685",
+  "mmlu_pro:11795",
+  "mmlu_pro:12148",
+  "mmlu_pro:12246",
+  "mmlu_pro:2243",
+  "mmlu_pro:246",
+  "mmlu_pro:2686",
+  "mmlu_pro:3291",
+  "mmlu_pro:3905",
+  "mmlu_pro:5174",
+  "mmlu_pro:5345",
+  "mmlu_pro:5535",
+  "mmlu_pro:5645",
+  "mmlu_pro:6005",
+  "mmlu_pro:6241",
+  "mmlu_pro:6762",
+  "mmlu_pro:6984",
+  "mmlu_pro:7103",
+  "mmlu_pro:7448",
+  "mmlu_pro:7940",
+  "mmlu_pro:7968",
+  "mmlu_pro:8695",
+  "mmlu_pro:9294",
+  "mmlu_pro:9705",
+  "mmlu_pro:10003",
+  "mmlu_pro:10010",
+  "mmlu_pro:10032",
+  "mmlu_pro:10083",
+  "mmlu_pro:10100",
+  "mmlu_pro:10116",
+  "mmlu_pro:10149",
+  "mmlu_pro:10185",
+  "mmlu_pro:10219",
+  "mmlu_pro:10241",
+  "mmlu_pro:10306",
+  "mmlu_pro:10323",
+  "mmlu_pro:10332",
+  "mmlu_pro:10347",
+  "mmlu_pro:10429",
+  "mmlu_pro:10508",
+  "mmlu_pro:10537",
+  "mmlu_pro:10543"
+ ],
+ "per_item": {
+  "mmlu_pro:6069": {
+   "tuned_acc": 0.542,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.5,
+   "olmo_32b_dpo": 0.5,
+   "olmo3_32b": 0.625
+  },
+  "mmlu_pro:1511": {
+   "tuned_acc": 0.625,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.5,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 0.625
+  },
+  "mmlu_pro:6813": {
+   "tuned_acc": 0.625,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 0.5,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.5
+  },
+  "mmlu_pro:11910": {
+   "tuned_acc": 0.667,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 0.5,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:11291": {
+   "tuned_acc": 0.708,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.5,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:5439": {
+   "tuned_acc": 0.708,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 0.625,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:5869": {
+   "tuned_acc": 0.708,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.625,
+   "olmo3_32b": 0.5
+  },
+  "mmlu_pro:7033": {
+   "tuned_acc": 0.708,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.625,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.625
+  },
+  "mmlu_pro:7462": {
+   "tuned_acc": 0.708,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 0.5
+  },
+  "mmlu_pro:9397": {
+   "tuned_acc": 0.708,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.625,
+   "olmo_32b_dpo": 0.625,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:10027": {
+   "tuned_acc": 0.75,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 0.625,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:2236": {
+   "tuned_acc": 0.75,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.625,
+   "olmo_32b_dpo": 0.625,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:3229": {
+   "tuned_acc": 0.75,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.625,
+   "olmo_32b_dpo": 0.625,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:3542": {
+   "tuned_acc": 0.75,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.625,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:6050": {
+   "tuned_acc": 0.75,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.5,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:670": {
+   "tuned_acc": 0.75,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 0.5,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10583": {
+   "tuned_acc": 0.792,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.625,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:5656": {
+   "tuned_acc": 0.792,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.625,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:6266": {
+   "tuned_acc": 0.792,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:6551": {
+   "tuned_acc": 0.792,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.625,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:7271": {
+   "tuned_acc": 0.792,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 0.625,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:947": {
+   "tuned_acc": 0.792,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.625
+  },
+  "mmlu_pro:360": {
+   "tuned_acc": 0.833,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.5
+  },
+  "mmlu_pro:5002": {
+   "tuned_acc": 0.833,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:5130": {
+   "tuned_acc": 0.833,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:7566": {
+   "tuned_acc": 0.833,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.625,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:7568": {
+   "tuned_acc": 0.833,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:10304": {
+   "tuned_acc": 0.875,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:10503": {
+   "tuned_acc": 0.875,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:10943": {
+   "tuned_acc": 0.875,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:2071": {
+   "tuned_acc": 0.875,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.625
+  },
+  "mmlu_pro:6610": {
+   "tuned_acc": 0.875,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:6750": {
+   "tuned_acc": 0.875,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:6867": {
+   "tuned_acc": 0.875,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.625
+  },
+  "mmlu_pro:7450": {
+   "tuned_acc": 0.875,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:9771": {
+   "tuned_acc": 0.875,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:9810": {
+   "tuned_acc": 0.875,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:10881": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:11679": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:12210": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:1260": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:1633": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:2292": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:3261": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 1.0,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:3341": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 1.0,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:3416": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.75
+  },
+  "mmlu_pro:4073": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:5659": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:5774": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:5839": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:6616": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:6696": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:7064": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.75,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:7440": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:8542": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:9333": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 0.75,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:9425": {
+   "tuned_acc": 0.917,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:1018": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10685": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:11795": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:12148": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:12246": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:2243": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:246": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:2686": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:3291": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 1.0,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:3905": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:5174": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:5345": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:5535": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:5645": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:6005": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:6241": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:6762": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:6984": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:7103": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:7448": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:7940": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 0.875,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:7968": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 0.875
+  },
+  "mmlu_pro:8695": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:9294": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:9705": {
+   "tuned_acc": 0.958,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 0.875,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10003": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 1.0,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10010": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10032": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10083": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10100": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10116": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10149": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 1.0,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10185": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10219": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10241": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.75,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10306": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10323": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10332": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10347": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.5,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10429": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10508": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.875,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10537": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 0.625,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  },
+  "mmlu_pro:10543": {
+   "tuned_acc": 1.0,
+   "olmo_32b_base": 1.0,
+   "olmo_32b_sft": 1.0,
+   "olmo_32b_dpo": 1.0,
+   "olmo3_32b": 1.0
+  }
+ }
+}

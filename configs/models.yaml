@@ -115,3 +115,39 @@ actors:
     tier: generalization_only
     necessity: na
     experiments: [hints]
+  olmo_32b_sft:
+    id: openai-api/vllm/olmo_32b_sft
+    provider: null
+    cot_access: native_raw
+    reasoning_enabled: null
+    tier: faithful_hints
+    necessity: na
+    no_cot_mechanism: prefill_continue
+    experiments: [hints]
+  olmo_32b_dpo:
+    id: openai-api/vllm/olmo_32b_dpo
+    provider: null
+    cot_access: native_raw
+    reasoning_enabled: null
+    tier: faithful_hints
+    necessity: na
+    no_cot_mechanism: prefill_continue
+    experiments: [hints]
+  olmo_32b_base:
+    id: openai-api/vllm/olmo_32b_base
+    provider: null
+    cot_access: body_channel
+    reasoning_enabled: null
+    tier: faithful_hints
+    necessity: na
+    no_cot_mechanism: prefill_continue
+    experiments: [hints]
+  olmo3_32b:
+    id: openai-api/vllm/olmo3_32b
+    provider: null
+    cot_access: native_raw
+    reasoning_enabled: null
+    tier: faithful_hints
+    necessity: confirmed
+    no_cot_mechanism: prefill_continue
+    experiments: [hints]

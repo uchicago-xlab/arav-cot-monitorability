@@ -79,17 +79,39 @@ async def run_actor(name, args):
           f"{', share-baseline x' + str(len(args.families)) + ' families' if args.share_baseline else ''}"
           f"{', cache_prompt' if margs else ''}) ===", flush=True)
 
-    items = data.load_gpqa(n=args.candidates)
+    load = data.load_mmlu_pro if args.dataset == "mmlu_pro" else data.load_gpqa
     t0 = time.monotonic()
-    if args.no_filter:
-        kept = items[:args.n_items]
+    if args.items:
+        # FIXED item set (scripts/select_item_set.py): every checkpoint sweeps the SAME items, so
+        # each contrast is item-paired and no part of the trajectory is item COMPOSITION. Filtering
+        # per-checkpoint instead gives each actor its own kept set (they overlapped only ~50/60 on
+        # GPQA, 28/60 across all four) and silently confounds the comparison. No filter is run here:
+        # the items were already screened on every checkpoint.
+        want = json.loads(Path(args.items).read_text())
+        ids = want["item_ids"] if isinstance(want, dict) else want
+        pool = load(n=args.item_pool)
+        by_id = {it.id: it for it in pool}
+        missing = [i for i in ids if i not in by_id]
+        if missing:
+            raise SystemExit(f"--items: {len(missing)} ids not found in the {args.dataset} pool "
+                             f"(raise --item-pool; first missing: {missing[:2]})")
+        items = kept = [by_id[i] for i in ids]
         rates = {}
+        print(f"  [{name}] FIXED item set: {len(kept)} items from {args.items} (no per-actor filter)",
+              flush=True)
     else:
-        kept, rates = await solver.correct_with_cot(model, items, n_samples=args.filter_samples,
-                                                    threshold=args.min_correct, concurrency=args.concurrency,
-                                                    min_emission=args.min_emission)
-        kept = kept[:args.n_items]
-    print(f"  [{name}] filter: kept {len(kept)}/{len(items)} (correct-with-CoT >= {args.min_correct})", flush=True)
+        items = load(n=args.candidates)
+        if args.no_filter:
+            kept = items[:args.n_items]
+            rates = {}
+        else:
+            kept, rates = await solver.correct_with_cot(model, items, n_samples=args.filter_samples,
+                                                        threshold=args.min_correct, concurrency=args.concurrency,
+                                                        min_emission=args.min_emission,
+                                                        max_threshold=args.max_correct)
+            kept = kept[:args.n_items]
+        print(f"  [{name}] filter: kept {len(kept)}/{len(items)} (correct-with-CoT >= {args.min_correct}"
+              f"{f', <= {args.max_correct}' if args.max_correct else ''})", flush=True)
     if not kept:
         print(f"  [{name}] no items survived the filter."); return None, None
 
@@ -128,14 +150,30 @@ async def run_actor(name, args):
             Path(f"logs/sweep_{name}{tg}.json").write_text(json.dumps({"summary": summ, "meta": meta}, indent=2, default=str))
         return summ, meta
 
+    # ONE semaphore for the whole actor run, and all items dispatched at once: the sweep keeps a
+    # standing backlog so `--concurrency` rollouts are ALWAYS in flight. (Previously each item was
+    # awaited in turn with its own semaphore, so in-flight collapsed to zero at every item boundary
+    # while the batch waited on its slowest long-CoT rollout — the GPU idled once per item, and for
+    # the arithmetic sweep only 100 coroutines even existed per item, capping --concurrency at 100.)
+    sem = asyncio.Semaphore(args.concurrency)
+    done = 0
+
+    async def _sweep_item(coro_fn, it, total, note=""):
+        nonlocal done
+        recs = await coro_fn(it)
+        done += 1
+        if done % 10 == 0:
+            print(f"  [{name}] ... {done}/{total} items swept{note}", flush=True)
+        return recs
+
     if args.share_baseline:   # none/simple + filter paid ONCE, complex per family
-        records_all = []
-        for i, it in enumerate(kept):
-            records_all += await solver.run_sweep_multi(model, it, n_samples=args.n_samples,
+        note = f" (shared baseline, {len(args.families)} fam)"
+        per_item = await asyncio.gather(*(
+            _sweep_item(lambda it: solver.run_sweep_multi(model, it, n_samples=args.n_samples,
                 families=tuple(args.families), levels=levels, seed=args.seed, cot_source=cot_source,
-                concurrency=args.concurrency, no_cot_mechanism=no_cot_mechanism)
-            if (i + 1) % 10 == 0:
-                print(f"  [{name}] ... {i + 1}/{len(kept)} items swept (shared baseline, {len(args.families)} fam)", flush=True)
+                concurrency=sem, no_cot_mechanism=no_cot_mechanism), it, len(kept), note)
+            for it in kept))
+        records_all = [r for sub in per_item for r in sub]   # gather preserves item order
         wall = time.monotonic() - t0
         base = [r for r in records_all if r.hint_kind in ("none", "simple")]
         summary = meta = None
@@ -149,13 +187,13 @@ async def run_actor(name, args):
         meta["n_gen_incl_filter"] = len(records_all) + (len(items) * args.filter_samples if not args.no_filter else 0)
         return summary, meta
 
-    records = []
-    for i, it in enumerate(kept):
-        records += await solver.run_sweep(model, it, n_samples=args.n_samples, levels=levels,
-                                          family=args.family, seed=args.seed, cot_source=cot_source,
-                                          concurrency=args.concurrency, no_cot_mechanism=no_cot_mechanism)
-        if (i + 1) % 10 == 0:
-            print(f"  [{name}] ... {i + 1}/{len(kept)} items swept", flush=True)
+    per_item = await asyncio.gather(*(
+        _sweep_item(lambda it: solver.run_sweep(model, it, n_samples=args.n_samples, levels=levels,
+                                                family=args.family, seed=args.seed, cot_source=cot_source,
+                                                concurrency=sem, no_cot_mechanism=no_cot_mechanism),
+                    it, len(kept))
+        for it in kept))
+    records = [r for sub in per_item for r in sub]           # gather preserves item order
     summary, meta = await _finalize(args.family, records, time.monotonic() - t0)
     meta = dict(meta); meta["n_gen_incl_filter"] = len(records) + (len(items) * args.filter_samples if not args.no_filter else 0)
     return summary, meta
@@ -248,6 +286,19 @@ if __name__ == "__main__":
                     help="Anthropic prompt caching (direct-Claude actors only, e.g. "
                          "opus_4_8_direct) — caches the metadata+question prefix across a cell's samples.")
     ap.add_argument("--candidates", type=int, default=120, help="items loaded before the correct-with-CoT filter")
+    ap.add_argument("--dataset", default="gpqa", choices=["gpqa", "mmlu_pro"],
+                    help="mmlu_pro: ~10 options/item, so the no-hint baseline (coincidentally picking "
+                         "the planted letter) is much lower than 4-way GPQA -> more hint signal per rollout")
+    ap.add_argument("--items", default=None,
+                    help="JSON with an item_ids list (scripts/select_item_set.py). Sweeps EXACTLY those "
+                         "items and runs NO per-actor filter, so every checkpoint sees an identical set "
+                         "and every contrast is item-paired.")
+    ap.add_argument("--item-pool", type=int, default=2000,
+                    help="how many dataset items to load when resolving --items ids")
+    ap.add_argument("--max-correct", type=float, default=None,
+                    help="PERSUADABLE band: also require correct-with-CoT <= this. Items the model always "
+                         "gets right have follow-rate BELOW the no-hint baseline, so they contribute "
+                         "negative hint-attributable signal while consuming full budget.")
     ap.add_argument("--filter-samples", type=int, default=4)
     ap.add_argument("--min-correct", type=float, default=0.5)
     ap.add_argument("--min-emission", type=float, default=None,
