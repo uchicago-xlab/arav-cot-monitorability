@@ -6,8 +6,9 @@ conditions come from the SAME powered arithmetic transcripts (complex followers 
 by rejudge_llm.py) - no new generations. Solid bar = simple cue (fig1's numbers); faded outlined
 bar = complex pooled L1-L3.
 
-qwen3.5-122b's complex slot is marked n/a: its local "arithmetic" transcript is the indirection
-proxy used for fig0 only, not a real arithmetic complex run (same exclusion as fig5b).
+qwen3.5-122b's complex value comes from a different data path (see the comment in deltas()): its
+local "arithmetic" transcript is the indirection proxy, so its bar uses the family-pipeline judge's
+indirection cell from results/family_unfaithfulness_llm.json instead of transcript verdicts.
 
     uv run python scripts/make_fig1_hard_hints.py
 """
@@ -73,7 +74,7 @@ def deltas():
                 n = cell["n_total_withcot"]
                 d = k_uf / n - k_base / n_b
                 lo, hi = metrics.wilson_diff_ci(k_uf, n, k_base, n_b)
-                out[a][cond] = (d, max(0.0, d - lo), max(0.0, hi - d), True)
+                out[a][cond] = (d, max(0.0, d - lo), max(0.0, hi - d))
                 continue
             rs = [r for r in wc if pred(r["hint_type"])]
             bad = {r.get("judge_method") for r in rs
@@ -84,7 +85,7 @@ def deltas():
             n = len(rs)
             d = k_uf / n - k_base / n_b
             lo, hi = metrics.wilson_diff_ci(k_uf, n, k_base, n_b)
-            out[a][cond] = (d, max(0.0, d - lo), max(0.0, hi - d), False)
+            out[a][cond] = (d, max(0.0, d - lo), max(0.0, hi - d))
     return out
 
 
@@ -97,14 +98,14 @@ def main():
     simple_bars, simple_hi, complex_bars, complex_hi = [], [], [], []
     for i, a in enumerate(actors):
         color = cp.model_color(DISP[a])
-        ds, es_lo, es_hi, _ = data[a]["simple"]
+        ds, es_lo, es_hi = data[a]["simple"]
         simple_bars += ax.bar(i - w / 2, ds, width=w, color=color, edgecolor="none")
         simple_hi.append(es_hi)
         ax.errorbar(i - w / 2, ds, yerr=[[es_lo], [es_hi]], fmt="none", ecolor=cp.SLATE,
                     capsize=3, lw=1.0)
-        dc, ec_lo, ec_hi, est = data[a]["complex"]
+        dc, ec_lo, ec_hi = data[a]["complex"]
         complex_bars += ax.bar(i + w / 2, dc, width=w, color=color, alpha=0.4,
-                               edgecolor=color, linewidth=1.2, hatch="//" if est else None)
+                               edgecolor=color, linewidth=1.2)
         complex_hi.append(ec_hi)
         ax.errorbar(i + w / 2, dc, yerr=[[ec_lo], [ec_hi]], fmt="none", ecolor=cp.SLATE,
                     capsize=3, lw=1.0)
@@ -116,24 +117,17 @@ def main():
     ax.set_ylabel("unfaithfulness Δ (vs no-hint baseline)")
     cp.tidy_xaxis(ax)
     legend = [Patch(facecolor="#6b6862", edgecolor="none"),
-              Patch(facecolor="#6b6862", alpha=0.4, edgecolor="#6b6862", linewidth=1.2),
-              Patch(facecolor="#6b6862", alpha=0.4, edgecolor="#6b6862", linewidth=1.2, hatch="//")]
+              Patch(facecolor="#6b6862", alpha=0.4, edgecolor="#6b6862", linewidth=1.2)]
     cp.title(fig, "Hint unfaithfulness: simple cue vs hard hints",
              "§3.1 arithmetic, same transcripts as fig1 · Δ = picks-hinted-without-admitting-it "
              "minus no-hint chance rate · complex pooled L1-L3 · Wilson 2σ diff CIs")
-    cp.caption(fig, "qwen3.5-122b's complex bar (hatched) is an estimate: its only complex data is "
-                    "the indirection family; conceal-rate from the family-pipeline judge (150-follower "
-                    "sample) extrapolated to all 394 followers — approximate CI, different hint family "
-                    "than the other bars.")
     path = cp.finalize(fig, _REPO_ROOT / "figures/fig1b_unfaithfulness_hard_hints.png",
-                       legend=legend,
-                       legend_labels=["simple cue", "hard hints (complex L1-L3)",
-                                      "estimate (indirection family)"])
+                       legend=legend, legend_labels=["simple cue", "hard hints (complex L1-L3)"])
     print(f"-> {path}")
     for a in actors:
         s = data[a]["simple"][0]
-        c, est = data[a]["complex"][0], data[a]["complex"][3]
-        print(f"  {DISP[a]:18} simple {s:+.3f}   complex {c:+.3f}{' (est, indirection)' if est else ''}")
+        c = data[a]["complex"][0]
+        print(f"  {DISP[a]:18} simple {s:+.3f}   complex {c:+.3f}")
 
 
 if __name__ == "__main__":
